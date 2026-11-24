@@ -82,6 +82,7 @@
   .chip i{width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
   .chip.moon{font-size:10.5px;padding:4px 5px;opacity:.82}
   .chip.moon i{width:5px;height:5px;box-shadow:0 0 5px var(--c)}
+  .chip.comet i{border-radius:2px;transform:rotate(45deg)}
   .chip:hover{background:rgba(255,255,255,.06);color:#e9efff}
   .chip.on{background:rgba(255,255,255,.11);color:#fff;opacity:1}
 
@@ -174,6 +175,7 @@
   <label class="tog"><input type="checkbox" id="optTrails" checked><i></i><span>Schweife</span></label>
   <label class="tog"><input type="checkbox" id="optLabels" checked><i></i><span>Namen</span></label>
   <label class="tog"><input type="checkbox" id="optDwarfs" checked><i></i><span>Pluto</span></label>
+  <label class="tog"><input type="checkbox" id="optComet" checked><i></i><span>Halley</span></label>
   <label class="tog"><input type="checkbox" id="optBelt" checked><i></i><span>Gürtel</span></label>
   <label class="tog"><input type="checkbox" id="optScale"><i></i><span>Maßstab</span></label>
   <div class="sep"></div>
@@ -186,7 +188,7 @@
 
 <div id="info" class="glass"></div>
 
-<div id="tip">Ziehen zum Verschieben · Scrollen zum Zoomen · Planet oder Mond anklicken</div>
+<div id="tip">Ziehen zum Verschieben · Scrollen zum Zoomen · Körper anklicken</div>
 
 <div id="bar">
   <div id="chips" class="glass"></div>
@@ -211,6 +213,7 @@
    1. Grundlagen
    ========================================================= */
 const TAU = Math.PI * 2, DEG = Math.PI / 180;
+const AU_KM = 149597870.7;
 const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
 const norm360 = x => { x = x % 360; return x < 0 ? x + 360 : x; };
 const sinD = d => Math.sin(d * DEG);
@@ -222,7 +225,7 @@ function rgba(hex, a){
 }
 
 /* =========================================================
-   2. Astronomische Daten (J2000-Bahnelemente, JPL)
+   2. Astronomische Daten
    ========================================================= */
 const SUN = {
   id:'sonne', name:'Sonne', isSun:true, kind:'Gelber Zwerg · G2V',
@@ -431,20 +434,7 @@ const BODIES = [
   }
 ];
 
-/* =========================================================
-   3. Monde
-   ---------------------------------------------------------
-   Alle Monde laufen auf echten Positionen:
-
-   Mond      : ELP-Hauptterme (Meeus Kap. 47), ±0,05°
-   Galileer  : mittlere Länge lon0 + n·t, kalibriert gegen
-               JPL Horizons (Vektoren, Jupiter-zentriert,
-               ekliptikales J2000-Frame).
-               Restfehler 2000–2060: höchstens 0,7°
-
-   dist/size = Darstellungsgrößen (Bahnradius gestaucht,
-               sonst läge Kallisto 26 Jupitermonde weit weg)
-   ========================================================= */
+/* ---- Monde: alle auf echten Positionen -------------------- */
 const MOONS = [
   { id:'mond', parent:'erde', name:'Mond', kind:'Trabant der Erde',
     ephem:'elp', rKm:384400, period:27.3217, rate:13.17636,
@@ -517,7 +507,43 @@ const MOONS = [
   }
 ];
 
-const ALL = [SUN, ...BODIES, ...MOONS];
+/* ---- Kometen ------------------------------------------------
+   Vollständige 3D-Keplerelemente (JPL SBDB, Lösung JPL#75).
+   Achtung: Halley läuft RETROGRAD, i = 162,2° – die Bahn liegt
+   also nicht in der Ekliptik. Die Draufsicht zeigt die
+   Projektion auf die Ekliptikebene; die Neigung ist damit
+   sichtbar, aber nicht die Bahn selbst.
+
+   Tp und P sind auf die beiden belegten Periheldurchgänge
+   1986-02-08 und 2061-07-28 kalibriert. Zwischen den
+   Stützpunkten interpoliert eine reine Kepler-Ellipse; real
+   verformt die Gasausströmung (nicht-gravitative Kräfte) die
+   Bahn um einige Wochen. Kontrolle gegen JPL Horizons für den
+   24.11.2026: Abweichung 0,21 AE ≈ 0,3°.
+   ------------------------------------------------------------ */
+const COMETS = [
+  {
+    id:'halley', name:'1P/Halley', kind:'Komet · Umlauf ≈ 75,5 Jahre', isComet:true,
+    a:17.928635, e:0.9679360,
+    inc:162.19053, node:59.098947, periArg:112.241431,
+    Tp: 2446469.9736 - 2451545.0,   /* Perihel 1986-02-08, Tage seit J2000 */
+    P: 27564.25,                    /* 1986-02-08 → 2061-07-28 */
+    q:0.5749,
+    color:'#8fe3d2', light:'#d9fff6', dark:'#1f5a51', size:2.2,
+    stats:[
+      ['Kern','ca. 15 × 8 km'],
+      ['Perihel','0,59 AE (88 Mio. km)'],
+      ['Aphel','35,3 AE (5,3 Mrd. km)'],
+      ['Exzentrizität','0,968'],
+      ['Bahnneigung','162,2° (retrograd)'],
+      ['Letztes Perihel','9. Februar 1986'],
+      ['Nächstes Perihel','28. Juli 2061']
+    ],
+    fact:'Edmond Halley erkannte 1705, dass die Kometen von 1531, 1607 und 1682 derselbe Körper sind, und sagte die Rückkehr für 1758 voraus – er erlebte sie nicht mehr. 1986 besuchte die ESA-Sonde Giotto den Kern aus 596 km Entfernung.'
+  }
+];
+
+const ALL = [SUN, ...BODIES, ...MOONS, ...COMETS];
 const BY_ID = {};
 ALL.forEach(b => BY_ID[b.id] = b);
 
@@ -526,8 +552,16 @@ MOONS.forEach(m => {
   (MOONS_OF[m.parent] = MOONS_OF[m.parent] || []).push(m);
 });
 
+/* Rotationskoeffizienten der Kometenbahn vorberechnen */
+COMETS.forEach(c => {
+  c._cw = Math.cos(c.periArg*DEG); c._sw = Math.sin(c.periArg*DEG);
+  c._co = Math.cos(c.node*DEG);    c._so = Math.sin(c.node*DEG);
+  c._ci = Math.cos(c.inc*DEG);     c._si = Math.sin(c.inc*DEG);
+  c._b = c.a * Math.sqrt(1 - c.e*c.e);
+});
+
 /* =========================================================
-   4. Zustand
+   3. Zustand
    ========================================================= */
 const J2000 = Date.UTC(2000, 0, 1, 12, 0, 0);
 const nowDays = () => (Date.now() - J2000) / 86400000;
@@ -544,10 +578,10 @@ const state = {
   panX: 0, panY: 0,
   hover: null, selected: null,
   showOrbits: true, showLabels: true, showTrails: true,
-  showDwarfs: true, showBelt: true, trueScale: false,
+  showDwarfs: true, showBelt: true, showComet: true, trueScale: false,
   sizeMul: 1,
   base: 1,
-  dTw: 0,          /* Zeitfortschritt der letzten Frame in Tagen */
+  dTw: 0,
   jump: false
 };
 
@@ -557,7 +591,7 @@ function project(r){
 }
 
 /* =========================================================
-   5. Kepler-Mechanik
+   4. Kepler-Mechanik (Planeten, koplanar)
    ========================================================= */
 function solveKepler(M, e){
   M = ((M % TAU) + TAU) % TAU;
@@ -587,6 +621,16 @@ function bodyLon(b, t){
   return norm360(v / DEG + b.peri);
 }
 
+/* wahre Position in AE (für Abstandsrechnungen) */
+function bodyAU(b, t){
+  const M = (b.L - b.peri) * DEG + TAU * (t / b.period);
+  const E = solveKepler(M, b.e);
+  const r = b.a * (1 - b.e * Math.cos(E));
+  const v = Math.atan2(Math.sqrt(1 - b.e * b.e) * Math.sin(E), Math.cos(E) - b.e);
+  const lam = v + b.peri * DEG;
+  return { x: r * Math.cos(lam), y: r * Math.sin(lam), z: 0 };
+}
+
 function buildPath(b){
   const N = 280, pts = [];
   for (let i = 0; i <= N; i++){
@@ -598,6 +642,50 @@ function buildPath(b){
     pts.push(R * Math.cos(lam), R * Math.sin(lam));
   }
   b.path = pts;
+}
+
+/* =========================================================
+   5. Komet: vollständige 3D-Keplerbahn
+   ========================================================= */
+function cometRot(c, xp, yp){
+  const x = (c._co*c._cw - c._so*c._sw*c._ci)*xp + (-c._co*c._sw - c._so*c._cw*c._ci)*yp;
+  const y = (c._so*c._cw + c._co*c._sw*c._ci)*xp + (-c._so*c._sw + c._co*c._cw*c._ci)*yp;
+  const z = (c._sw*c._si)*xp + (c._cw*c._si)*yp;
+  return { x, y, z };
+}
+
+function cometPos(c, t){
+  const M = TAU * ((t - c.Tp) / c.P);
+  const E = solveKepler(M, c.e);
+  const xp = c.a * (Math.cos(E) - c.e);
+  const yp = c._b * Math.sin(E);
+  const p = cometRot(c, xp, yp);
+  p.r = Math.sqrt(p.x*p.x + p.y*p.y + p.z*p.z);
+  p.rho = Math.hypot(p.x, p.y);
+  return p;
+}
+
+/* Projektion in die Draufsicht: der scheinbare Abstand von der
+   Sonne ist rho (die Ekliptik-Komponente), also wird rho durch
+   die Abstandsskala geschickt – die Richtung bleibt erhalten. */
+function cometWorld(c, t){
+  const p = cometPos(c, t);
+  const sc = p.rho > 1e-6 ? project(p.rho) / p.rho : 0;
+  return { wx: p.x * sc, wy: p.y * sc, r: p.r, rho: p.rho, z: p.z };
+}
+
+function buildCometPath(c){
+  const N = 420, pts = [];
+  for (let i = 0; i <= N; i++){
+    const E = i / N * TAU;
+    const xp = c.a * (Math.cos(E) - c.e);
+    const yp = c._b * Math.sin(E);
+    const p = cometRot(c, xp, yp);
+    const rho = Math.hypot(p.x, p.y);
+    const sc = rho > 1e-6 ? project(rho) / rho : 0;
+    pts.push(p.x * sc, p.y * sc);
+  }
+  c.path = pts;
 }
 
 /* =========================================================
@@ -668,9 +756,6 @@ function moonEphem(t){
   return { lon: norm360(lon - 1.396971 * T), dist: dist };
 }
 
-/* =========================================================
-   7. Einheitlicher Mondzustand
-   ========================================================= */
 function moonState(m, t){
   if (m.ephem === 'gal'){
     return { lon: norm360(m.lon0 + m.n * t), rKm: m.rKm };
@@ -705,7 +790,7 @@ function updateMoonLive(){
 }
 
 /* =========================================================
-   8. Datum ⇄ Tage seit J2000
+   7. Datum
    ========================================================= */
 function daysFromYMD(y, m, d){
   const dt = new Date(Date.UTC(2000, 0, 1, 12, 0, 0));
@@ -719,9 +804,10 @@ function ymdString(d){
          String(d.getUTCDate()).padStart(2, '0');
 }
 const dateAt = () => new Date(J2000 + state.t * 86400000);
+const daysToDate = (daysSinceJ2000) => new Date(J2000 + daysSinceJ2000 * 86400000);
 
 /* =========================================================
-   9. Canvas & Kamera
+   8. Canvas & Kamera
    ========================================================= */
 const cv = document.getElementById('sky');
 const ctx = cv.getContext('2d');
@@ -799,7 +885,7 @@ function resize(){
 }
 
 /* =========================================================
-   10. Größenlogik
+   9. Größenlogik
    ========================================================= */
 function planetRadius(b){
   const v = vscale * state.sizeMul;
@@ -814,7 +900,7 @@ function sunRadius(){
 }
 
 /* =========================================================
-   11. Zeichnen – Grundgerüst
+   10. Zeichnen – Grundgerüst
    ========================================================= */
 function drawStars(time){
   for (let i = 0; i < stars.length; i++){
@@ -865,6 +951,25 @@ function drawOrbits(){
     ctx.strokeStyle = rgba(b.light, active ? 0.55 : 0.19);
     ctx.stroke();
   }
+
+  /* Kometenbahn: gepunktet, um sie von den Planetenbahnen zu trennen */
+  if (state.showComet){
+    for (const c of COMETS){
+      const p = c.path;
+      const active = (state.hover === c.id || state.selected === c.id);
+      ctx.beginPath();
+      for (let i = 0; i < p.length; i += 2){
+        const s = w2s(p[i], p[i+1]);
+        if (i === 0) ctx.moveTo(s.x, s.y); else ctx.lineTo(s.x, s.y);
+      }
+      ctx.closePath();
+      ctx.setLineDash([4, 5]);
+      ctx.lineWidth = active ? 1.4 : 1;
+      ctx.strokeStyle = rgba(c.light, active ? 0.62 : 0.26);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
 }
 
 function drawTrail(b){
@@ -890,7 +995,7 @@ function drawTrail(b){
 }
 
 /* =========================================================
-   12. Planetenkörper
+   11. Planetenkörper
    ========================================================= */
 function drawDisc(b, sx, sy, r, sunS){
   const flat = b.flat || 1;
@@ -986,7 +1091,7 @@ function drawDisc(b, sx, sy, r, sunS){
 }
 
 /* =========================================================
-   13. Saturnringe
+   12. Saturnringe
    ========================================================= */
 const RING_TILT = -0.36;
 const RING_SQUASH = 0.36;
@@ -1024,7 +1129,7 @@ function drawRings(sx, sy, r, back){
 }
 
 /* =========================================================
-   14. Sonne
+   13. Sonne
    ========================================================= */
 function drawSun(time){
   const s = w2s(0, 0);
@@ -1060,12 +1165,7 @@ function drawSun(time){
 }
 
 /* =========================================================
-   15. Monde mit Bewegungsspur
-   ---------------------------------------------------------
-   Bei hoher Simulationsgeschwindigkeit überstreicht z. B. Io
-   mehrere zehntausend Grad pro Sekunde. Statt eines flackernden
-   Punktes wird die in der letzten Frame tatsächlich durchlaufene
-   Bahnstrecke gezeichnet – bei extremem Tempo ein ganzer Ring.
+   14. Monde
    ========================================================= */
 function drawMoonSmear(px, py, orbR, angNow, sweep, color, width){
   const sw = Math.abs(sweep);
@@ -1120,7 +1220,6 @@ function drawMoons(parent, px, py, pr){
       ctx.stroke();
     }
 
-    /* Bewegungsspur: Winkelüberstreichung der letzten Frame */
     if (state.dTw){
       const sweep = (m.rate * DEG) * state.dTw;
       if (Math.abs(sweep) > 0.015){
@@ -1149,6 +1248,129 @@ function drawMoons(parent, px, py, pr){
       ctx.lineWidth = 1.1;
       ctx.stroke();
     }
+  }
+}
+
+/* =========================================================
+   15. Komet
+   ---------------------------------------------------------
+   Koma + zwei Schweife, die sonnenabgewandt zeigen:
+   ein breiter, leicht gekrümmter Staubschweif und ein
+   schmaler, gerader Ionenschweif. Beide wachsen mit 1/r²,
+   also nur in Sonnennähe sichtbar – im Aphel ist Halley
+   ein inaktiver, punktförmiger Kern.
+   ========================================================= */
+function drawComet(c, time){
+  const cw = cometWorld(c, state.t);
+  const s = w2s(cw.wx, cw.wy);
+  const sunS = w2s(0, 0);
+
+  const r = Math.max(1.9 * vscale * state.sizeMul,
+                     c.size * 1.7 * vscale * state.sizeMul * Math.pow(state.zoom, 0.28));
+  positions[c.id] = { sx: s.x, sy: s.y, r: Math.max(r + 3, 10) };
+
+  /* Bewegungsrichtung für den Kometenschweif der letzten Frames */
+  if (state.showTrails && state.dTw){
+    const N = 12;
+    const span = state.dTw * 26;
+    let prev = { x: s.x, y: s.y };
+    for (let i = 1; i <= N; i++){
+      const past = cometWorld(c, state.t - span * i / N * state.dir);
+      const ps = w2s(past.wx, past.wy);
+      const f = 1 - i / N;
+      ctx.strokeStyle = rgba(c.light, 0.34 * f * f);
+      ctx.lineWidth = Math.max(0.8, r * 1.5 * f);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.lineTo(ps.x, ps.y);
+      ctx.stroke();
+      prev = ps;
+    }
+  }
+
+  /* Schweife – nur in Sonnennähe */
+  const tailBase = 95 / (cw.r * cw.r);
+  const tailLen = clamp(tailBase, 0, 150) * Math.pow(state.zoom, 0.25);
+
+  if (tailLen > 3){
+    const dxs = s.x - sunS.x, dys = s.y - sunS.y;
+    const dl = Math.hypot(dxs, dys) || 1;
+    const ux = dxs / dl, uy = dys / dl;
+    const nx = -uy, ny = ux;
+
+    /* Staubschweif: breit, leicht gekrümmt, gelblich-weiß */
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(s.x + nx * r * 0.7, s.y + ny * r * 0.7);
+    ctx.quadraticCurveTo(
+      s.x + ux * tailLen * 0.55 + nx * r * 5.5,
+      s.y + uy * tailLen * 0.55 + ny * r * 5.5,
+      s.x + ux * tailLen + nx * r * 1.2,
+      s.y + uy * tailLen + ny * r * 1.2
+    );
+    ctx.lineTo(s.x + ux * tailLen - nx * r * 1.2, s.y + uy * tailLen - ny * r * 1.2);
+    ctx.quadraticCurveTo(
+      s.x + ux * tailLen * 0.55 - nx * r * 4.0,
+      s.y + uy * tailLen * 0.55 - ny * r * 4.0,
+      s.x - nx * r * 0.7, s.y - ny * r * 0.7
+    );
+    ctx.closePath();
+    const gd = ctx.createLinearGradient(s.x, s.y, s.x + ux * tailLen, s.y + uy * tailLen);
+    gd.addColorStop(0, 'rgba(226,244,255,0.42)');
+    gd.addColorStop(0.45, 'rgba(198,224,240,0.17)');
+    gd.addColorStop(1, 'rgba(190,215,235,0)');
+    ctx.fillStyle = gd;
+    ctx.fill();
+    ctx.restore();
+
+    /* Ionenschweif: schmal, gerade, bläulich */
+    ctx.beginPath();
+    ctx.moveTo(s.x + nx * r * 0.35, s.y + ny * r * 0.35);
+    ctx.lineTo(s.x + ux * tailLen * 1.25 + nx * r * 0.9,
+               s.y + uy * tailLen * 1.25 + ny * r * 0.9);
+    ctx.lineTo(s.x + ux * tailLen * 1.25 - nx * r * 0.9,
+               s.y + uy * tailLen * 1.25 - ny * r * 0.9);
+    ctx.lineTo(s.x - nx * r * 0.35, s.y - ny * r * 0.35);
+    ctx.closePath();
+    const gi = ctx.createLinearGradient(s.x, s.y,
+      s.x + ux * tailLen * 1.25, s.y + uy * tailLen * 1.25);
+    gi.addColorStop(0, 'rgba(150,215,255,0.34)');
+    gi.addColorStop(0.5, 'rgba(120,190,255,0.12)');
+    gi.addColorStop(1, 'rgba(110,180,255,0)');
+    ctx.fillStyle = gi;
+    ctx.fill();
+  }
+
+  /* Koma */
+  const coma = r * (2.4 + clamp(tailBase * 0.02, 0, 2.4));
+  const gc = ctx.createRadialGradient(s.x, s.y, r * 0.4, s.x, s.y, coma);
+  gc.addColorStop(0, 'rgba(220,255,246,0.55)');
+  gc.addColorStop(0.4, 'rgba(150,235,215,0.18)');
+  gc.addColorStop(1, 'rgba(120,220,200,0)');
+  ctx.fillStyle = gc;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, coma, 0, TAU);
+  ctx.fill();
+
+  /* Kern */
+  const gn = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r);
+  gn.addColorStop(0, '#ffffff');
+  gn.addColorStop(0.55, c.light);
+  gn.addColorStop(1, c.color);
+  ctx.fillStyle = gn;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, r, 0, TAU);
+  ctx.fill();
+
+  if (state.hover === c.id || state.selected === c.id){
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r + 7, 0, TAU);
+    ctx.strokeStyle = rgba(c.light, 0.8);
+    ctx.lineWidth = 1.3;
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
   }
 }
 
@@ -1226,6 +1448,17 @@ function drawLabels(){
     ctx.fillText(m.name, p.sx + p.r + 4, p.sy);
   }
 
+  for (const c of COMETS){
+    const p = positions[c.id];
+    if (!p) continue;
+    const hot = (state.hover === c.id || state.selected === c.id);
+    ctx.font = hot
+      ? '600 11.5px ui-sans-serif,system-ui,sans-serif'
+      : '600 11px ui-sans-serif,system-ui,sans-serif';
+    ctx.fillStyle = hot ? '#ffffff' : 'rgba(180,245,232,.66)';
+    ctx.fillText(c.name, p.sx + p.r + 6, p.sy);
+  }
+
   ctx.shadowBlur = 0;
 }
 
@@ -1244,6 +1477,11 @@ function render(time){
   positions = {};
   drawSun(time);
   drawBodies();
+
+  if (state.showComet){
+    for (const c of COMETS) drawComet(c, time);
+  }
+
   drawLabels();
 }
 
@@ -1294,7 +1532,7 @@ const chipsEl = document.getElementById('chips');
 const CHIP_ORDER = [
   'sonne','merkur','venus','erde','mond','mars',
   'jupiter','io','europa','ganymed','kallisto',
-  'saturn','uranus','neptun','pluto'
+  'saturn','uranus','neptun','pluto','halley'
 ];
 
 function buildChips(){
@@ -1303,7 +1541,7 @@ function buildChips(){
     const b = BY_ID[id];
     if (!b) continue;
     const el = document.createElement('button');
-    el.className = 'chip' + (b.parent ? ' moon' : '');
+    el.className = 'chip' + (b.parent ? ' moon' : '') + (b.isComet ? ' comet' : '');
     el.dataset.id = id;
     el.innerHTML = '<i style="--c:' + b.light + '"></i>' + b.name;
     el.addEventListener('click', () => select(id));
@@ -1321,11 +1559,17 @@ function updateChips(){
 function select(id){
   if (id && state.selected === id) id = null;
   const b = id ? BY_ID[id] : null;
+
   if (b && b.isDwarf && !state.showDwarfs){
     document.getElementById('optDwarfs').checked = true;
     state.showDwarfs = true;
     refit();
   }
+  if (b && b.isComet && !state.showComet){
+    document.getElementById('optComet').checked = true;
+    state.showComet = true;
+  }
+
   state.selected = id;
   renderInfo();
   updateChips();
@@ -1336,6 +1580,9 @@ function fmtNum(n, dec){
     minimumFractionDigits: dec, maximumFractionDigits: dec
   });
 }
+const fmtDateShort = new Intl.DateTimeFormat('de-DE', {
+  day:'2-digit', month:'long', year:'numeric'
+});
 
 function renderInfo(){
   const b = state.selected ? BY_ID[state.selected] : null;
@@ -1375,8 +1622,21 @@ function renderInfo(){
         '<div><span>Umlaufzeit</span><b>' + fmtNum(b.period, 2) + ' Tage</b></div>' +
       '</div>';
     note = '<p class="note">Position aus mittlerer Länge λ₀ + n·t, kalibriert ' +
-      'gegen JPL Horizons. Restfehler 2000–2060 unter 0,7° – das sind ' +
-      'weniger als ein Pixel.</p>';
+      'gegen JPL Horizons. Restfehler 2000–2060 unter 0,7°.</p>';
+  } else if (b.isComet){
+    extra =
+      '<div class="lbl">Aktuell</div>' +
+      '<div class="grid">' +
+        '<div><span>Abstand Sonne</span><b id="lvR">—</b></div>' +
+        '<div><span>Abstand Erde</span><b id="lvEarth">—</b></div>' +
+        '<div><span>Abstand Ekliptik</span><b id="lvZ">—</b></div>' +
+        '<div><span>Nächstes Perihel</span><b id="lvNext">—</b></div>' +
+        '<div><span>Noch</span><b id="lvLeft">—</b></div>' +
+      '</div>';
+    note = '<p class="note">Bahn aus den JPL-Elementen (Lösung JPL#75). ' +
+      'Halley läuft retrograd und ist 162° gegen die Ekliptik geneigt – dargestellt ' +
+      'ist die Projektion von oben, nicht die räumliche Bahn. Abweichung gegen ' +
+      'JPL Horizons aktuell unter 0,3°.</p>';
   }
 
   infoEl.style.setProperty('--c', b.light);
@@ -1392,16 +1652,42 @@ function renderInfo(){
   document.getElementById('infoClose').addEventListener('click', () => select(null));
 
   if (b.id === 'mond') drawPhaseIcon(document.getElementById('phaseIcon'));
-  updateMoonCard();
+  updateLiveCard();
 }
 
-function updateMoonCard(){
+function updateLiveCard(){
   const b = state.selected ? BY_ID[state.selected] : null;
-  if (!b || !b.parent) return;
+  if (!b) return;
+
+  if (b.isComet){
+    const elR = document.getElementById('lvR');
+    if (!elR) return;
+    const cw = cometWorld(b, state.t);
+    const p = cometPos(b, state.t);
+    const ea = bodyAU(BY_ID.erde, state.t);
+    const dEarth = Math.sqrt(
+      Math.pow(p.x - ea.x, 2) + Math.pow(p.y - ea.y, 2) + Math.pow(p.z, 2)
+    );
+
+    elR.textContent = fmtNum(cw.r, 3) + ' AE';
+    document.getElementById('lvEarth').textContent =
+      fmtNum(dEarth * AU_KM / 1e6, 1) + ' Mio. km';
+    document.getElementById('lvZ').textContent =
+      (p.z >= 0 ? '+' : '') + fmtNum(p.z, 2) + ' AE';
+
+    const k = Math.ceil((state.t - b.Tp) / b.P);
+    const next = b.Tp + k * b.P;
+    document.getElementById('lvNext').textContent =
+      fmtDateShort.format(daysToDate(next));
+    document.getElementById('lvLeft').textContent =
+      fmtNum(next - state.t, 0) + ' Tage';
+    return;
+  }
+
+  if (!b.parent) return;
 
   const elDist = document.getElementById('lvDist');
   if (!elDist) return;
-
   const st = moonState(b, state.t);
 
   if (b.id === 'mond'){
@@ -1445,6 +1731,9 @@ function hitTest(x, y){
     consider(b.id, 17);
   }
   for (let i = 0; i < MOONS.length; i++) consider(MOONS[i].id, 11);
+  if (state.showComet){
+    for (let i = 0; i < COMETS.length; i++) consider(COMETS[i].id, 14);
+  }
 
   const s = positions.sonne;
   if (s){
@@ -1617,6 +1906,7 @@ document.getElementById('reset').addEventListener('click', resetView);
 
 function refit(){
   for (const b of BODIES) buildPath(b);
+  for (const c of COMETS) buildCometPath(c);
   computeBase();
   state.zoom = 1;
   state.panX = 0;
@@ -1635,6 +1925,10 @@ document.getElementById('optLabels').addEventListener('change', e => {
 });
 document.getElementById('optBelt').addEventListener('change', e => {
   state.showBelt = e.target.checked;
+});
+document.getElementById('optComet').addEventListener('change', e => {
+  state.showComet = e.target.checked;
+  if (!state.showComet && state.selected === 'halley') select(null);
 });
 document.getElementById('optDwarfs').addEventListener('change', e => {
   state.showDwarfs = e.target.checked;
@@ -1660,6 +1954,7 @@ window.addEventListener('keydown', e => {
   else if (e.key === 'd' || e.key === 'D'){ dirBtn.click(); }
   else if (e.key === '+' || e.key === '='){ zoomAt(W/2, H/2, 1.3); }
   else if (e.key === '-' || e.key === '_'){ zoomAt(W/2, H/2, 1/1.3); }
+  else if (e.key === 'h' || e.key === 'H'){ select('halley'); }
   else if (e.key === 'Escape'){ select(null); }
 });
 
@@ -1702,7 +1997,7 @@ function frame(now){
     const d = dateAt();
     dateEl.textContent = fmtDate.format(d);
     if (document.activeElement !== dateIn) dateIn.value = ymdString(d);
-    updateMoonCard();
+    updateLiveCard();
 
     const parts = [];
     if (state.dir < 0) parts.push('◀ rückwärts');
@@ -1722,6 +2017,7 @@ function frame(now){
    ========================================================= */
 resize();
 for (const b of BODIES) buildPath(b);
+for (const c of COMETS) buildCometPath(c);
 makeBelts();
 buildChips();
 computeBase();
