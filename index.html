@@ -1,0 +1,1740 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Sonnensystem · Draufsicht</title>
+<style>
+  :root{
+    --txt:#e9efff; --dim:#8d9cc0; --line:rgba(130,165,255,.16); --accent:#6cc6ff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#02030a;color:var(--txt);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  canvas#sky{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+  canvas#sky.grabbing{cursor:grabbing}
+  .vignette{position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(115% 85% at 50% 46%,rgba(0,0,0,0) 38%,rgba(0,0,0,.62) 100%)}
+
+  .glass{background:rgba(10,14,26,.62);border:1px solid var(--line);border-radius:14px;
+    backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);
+    box-shadow:0 10px 40px rgba(0,0,0,.45)}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;top:14px;left:14px;padding:12px 16px 11px;z-index:5;pointer-events:none;
+    max-width:min(340px,58vw)}
+  #hud .eyebrow{font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+  #hud h1{margin:2px 0 7px;font-size:19px;font-weight:650;letter-spacing:.01em}
+  #hud .date{font-size:15px;font-variant-numeric:tabular-nums;color:#d3e3ff}
+  #hud .sub{margin-top:3px;font-size:10.5px;color:var(--dim);font-variant-numeric:tabular-nums;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .timeRow{margin-top:9px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;pointer-events:auto}
+  #dateIn{background:rgba(255,255,255,.07);border:1px solid var(--line);color:#dbe7ff;
+    font:inherit;font-size:11px;padding:4px 6px;border-radius:8px;outline:none;width:124px;
+    color-scheme:dark;font-variant-numeric:tabular-nums;transition:.15s}
+  #dateIn:hover{background:rgba(255,255,255,.12)}
+  #dateIn:focus{border-color:rgba(120,190,255,.65);box-shadow:0 0 0 3px rgba(108,198,255,.12)}
+  #todayBtn{border:1px solid var(--line);background:rgba(108,198,255,.12);color:#bfe8ff;
+    font:inherit;font-size:11px;padding:4px 10px;border-radius:8px;cursor:pointer;transition:.15s;
+    white-space:nowrap}
+  #todayBtn:hover{background:rgba(108,198,255,.26)}
+  #todayBtn:active{transform:scale(.95)}
+  #todayBtn.flash{background:rgba(140,255,200,.35);color:#eafff5}
+
+  /* ---------- Einstellungen ---------- */
+  #settings{position:fixed;top:14px;right:14px;padding:10px 12px;z-index:5;display:flex;
+    flex-direction:column;gap:1px}
+  #settings label.tog{display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--dim);
+    cursor:pointer;padding:3px 2px;user-select:none}
+  #settings input[type=checkbox]{display:none}
+  #settings label.tog i{width:26px;height:15px;border-radius:99px;background:rgba(255,255,255,.12);
+    position:relative;transition:.18s;flex:0 0 auto}
+  #settings label.tog i:after{content:'';position:absolute;top:2px;left:2px;width:11px;height:11px;
+    border-radius:50%;background:#9fb0d4;transition:.18s}
+  #settings input[type=checkbox]:checked + i{background:rgba(102,199,255,.35)}
+  #settings input[type=checkbox]:checked + i:after{transform:translateX(11px);background:#bfe8ff}
+  #settings input[type=checkbox]:checked ~ span{color:#dbe7ff}
+
+  #settings .sep{height:1px;background:var(--line);margin:7px 0 6px}
+  #settings .sizeRow{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);
+    white-space:nowrap;padding:1px 2px}
+  #settings .sizeRow b{font-weight:600;color:#cfe0ff;font-variant-numeric:tabular-nums;
+    min-width:31px;text-align:right;font-size:10.5px}
+  #sizeMul{-webkit-appearance:none;appearance:none;width:68px;height:4px;border-radius:99px;
+    background:rgba(255,255,255,.15);outline:none;margin:0;cursor:pointer}
+  #sizeMul::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;
+    background:#bfe8ff;cursor:pointer;box-shadow:0 0 8px rgba(110,200,255,.7)}
+  #sizeMul::-moz-range-thumb{width:11px;height:11px;border:0;border-radius:50%;background:#bfe8ff;cursor:pointer}
+
+  /* ---------- Untere Leiste ---------- */
+  #bar{position:fixed;left:12px;right:12px;bottom:12px;display:flex;gap:10px;align-items:center;
+    justify-content:space-between;flex-wrap:wrap;z-index:6;pointer-events:none}
+  #bar > *{pointer-events:auto}
+
+  #chips{display:flex;gap:4px;overflow-x:auto;padding:7px 9px;flex:1 1 300px;min-width:0;
+    scrollbar-width:none}
+  #chips::-webkit-scrollbar{display:none}
+  .chip{flex:0 0 auto;display:flex;align-items:center;gap:6px;border:0;background:transparent;
+    color:var(--dim);font:inherit;font-size:11.5px;padding:4px 7px;border-radius:8px;
+    cursor:pointer;transition:.15s;white-space:nowrap}
+  .chip i{width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
+  .chip.moon{font-size:10.5px;padding:4px 5px;opacity:.82}
+  .chip.moon i{width:5px;height:5px;box-shadow:0 0 5px var(--c)}
+  .chip:hover{background:rgba(255,255,255,.06);color:#e9efff}
+  .chip.on{background:rgba(255,255,255,.11);color:#fff;opacity:1}
+
+  #ctrls{display:flex;align-items:center;gap:7px;padding:7px 10px}
+  .btn{border:0;background:rgba(255,255,255,.07);color:#d8e3ff;width:30px;height:30px;
+    border-radius:9px;cursor:pointer;font-size:14px;display:grid;place-items:center;transition:.15s;
+    flex:0 0 auto;line-height:1}
+  .btn:hover{background:rgba(255,255,255,.15)}
+  .btn:active{transform:scale(.94)}
+  .btn.rev{background:rgba(255,190,120,.16);color:#ffd9a8}
+  #speedWrap{display:flex;flex-direction:column;gap:3px;width:128px;padding:0 3px}
+  #speed{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:99px;
+    background:rgba(255,255,255,.15);outline:none;margin:5px 0}
+  #speed::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+    background:#bfe8ff;cursor:pointer;box-shadow:0 0 10px rgba(110,200,255,.75)}
+  #speed::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:#bfe8ff;cursor:pointer}
+  #speedLbl{font-size:10px;color:var(--dim);text-align:center;font-variant-numeric:tabular-nums;
+    white-space:nowrap;overflow:hidden}
+
+  /* ---------- Info-Panel ---------- */
+  #info{position:fixed;right:14px;top:50%;width:290px;max-height:74vh;overflow:auto;padding:15px 17px 16px;
+    z-index:7;transform:translate(130%,-50%);transition:transform .34s cubic-bezier(.2,.8,.2,1);
+    --c:#6cc6ff}
+  #info.show{transform:translate(0,-50%)}
+  #info .x{position:absolute;top:9px;right:10px;border:0;background:rgba(255,255,255,.07);
+    color:#c8d6f5;width:24px;height:24px;border-radius:7px;cursor:pointer;font-size:15px;line-height:1}
+  #info .x:hover{background:rgba(255,255,255,.16)}
+  #info .head{display:flex;align-items:center;gap:9px}
+  #info .dot{width:11px;height:11px;border-radius:50%;background:var(--c);
+    box-shadow:0 0 14px var(--c);flex:0 0 auto}
+  #info h2{margin:0;font-size:17px;font-weight:650}
+  #info .kind{margin:2px 0 0 20px;font-size:10.5px;color:var(--dim);letter-spacing:.04em}
+  #info .grid{margin-top:12px;border-top:1px solid var(--line)}
+  #info .grid div{display:flex;justify-content:space-between;gap:14px;padding:6.5px 0;
+    border-bottom:1px solid rgba(130,165,255,.08);font-size:11.5px}
+  #info .grid span{color:var(--dim)}
+  #info .grid b{font-weight:550;text-align:right}
+  #info .fact{margin:12px 0 0;font-size:11.5px;line-height:1.55;color:#b7c5e6;
+    border-left:2px solid var(--c);padding-left:10px}
+  #info .note{margin:9px 0 0;font-size:10.5px;line-height:1.45;color:#8d9cc0;font-style:italic}
+  #info .lbl{margin:10px 0 0;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--dim)}
+  #info .moonwrap{display:flex;align-items:center;gap:14px;margin:12px 0 2px}
+  #info .moonwrap canvas{width:62px;height:62px;flex:0 0 auto}
+  #info .phbig{font-size:12px;color:#dbe7ff;line-height:1.4}
+
+  /* ---------- Hinweis ---------- */
+  #tip{position:fixed;left:50%;bottom:78px;transform:translateX(-50%);font-size:11px;color:var(--dim);
+    background:rgba(10,14,26,.7);border:1px solid var(--line);padding:7px 14px;border-radius:99px;
+    pointer-events:none;transition:opacity .8s;z-index:4;white-space:nowrap}
+
+  @media (max-width:820px){
+    #hud{max-width:60vw;padding:9px 12px 8px}
+    #hud h1{font-size:15px;margin-bottom:5px}
+    #hud .date{font-size:12.5px}
+    #hud .sub{display:none}
+    #dateIn{width:112px;font-size:10.5px}
+    #todayBtn{font-size:10.5px;padding:4px 8px}
+    #settings{padding:8px 10px}
+    #settings label.tog{font-size:10.5px;gap:7px}
+    #settings .sizeRow{font-size:10px;gap:6px}
+    #sizeMul{width:56px}
+    #info{left:10px;right:10px;width:auto;top:auto;bottom:96px;max-height:46vh;
+      transform:translateY(150%);border-radius:16px}
+    #info.show{transform:translateY(0)}
+    #chips{flex:1 1 100%;order:2;justify-content:flex-start}
+    #ctrls{order:1;margin:0 auto;flex:0 0 auto}
+    #speedWrap{width:100px}
+    #tip{display:none}
+  }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<div class="vignette"></div>
+
+<div id="hud" class="glass">
+  <div class="eyebrow">Heliozentrische Draufsicht</div>
+  <h1>Sonnensystem</h1>
+  <div class="date" id="date">—</div>
+  <div class="sub" id="sub">—</div>
+  <div class="timeRow">
+    <input type="date" id="dateIn" min="1600-01-01" max="2400-12-31" step="1" aria-label="Datum wählen">
+    <button id="todayBtn" title="Zurück zum heutigen Datum (T)">Heute</button>
+  </div>
+</div>
+
+<div id="settings" class="glass">
+  <label class="tog"><input type="checkbox" id="optOrbits" checked><i></i><span>Bahnen</span></label>
+  <label class="tog"><input type="checkbox" id="optTrails" checked><i></i><span>Schweife</span></label>
+  <label class="tog"><input type="checkbox" id="optLabels" checked><i></i><span>Namen</span></label>
+  <label class="tog"><input type="checkbox" id="optDwarfs" checked><i></i><span>Pluto</span></label>
+  <label class="tog"><input type="checkbox" id="optBelt" checked><i></i><span>Gürtel</span></label>
+  <label class="tog"><input type="checkbox" id="optScale"><i></i><span>Maßstab</span></label>
+  <div class="sep"></div>
+  <div class="sizeRow">
+    <span>Größe</span>
+    <input type="range" id="sizeMul" min="70" max="220" value="100" aria-label="Planetengröße">
+    <b id="sizeLbl">1,0×</b>
+  </div>
+</div>
+
+<div id="info" class="glass"></div>
+
+<div id="tip">Ziehen zum Verschieben · Scrollen zum Zoomen · Planet oder Mond anklicken</div>
+
+<div id="bar">
+  <div id="chips" class="glass"></div>
+  <div id="ctrls" class="glass">
+    <button class="btn" id="dir" title="Zeitrichtung umkehren (D)">⏩</button>
+    <button class="btn" id="play" title="Play / Pause (Leertaste)">⏸</button>
+    <div id="speedWrap">
+      <input type="range" id="speed" min="0" max="100" value="51" aria-label="Geschwindigkeit">
+      <span id="speedLbl">—</span>
+    </div>
+    <button class="btn" id="zoomOut" title="Herauszoomen">−</button>
+    <button class="btn" id="zoomIn" title="Hineinzoomen">+</button>
+    <button class="btn" id="reset" title="Ansicht zurücksetzen (R)">↺</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* =========================================================
+   1. Grundlagen
+   ========================================================= */
+const TAU = Math.PI * 2, DEG = Math.PI / 180;
+const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
+const norm360 = x => { x = x % 360; return x < 0 ? x + 360 : x; };
+const sinD = d => Math.sin(d * DEG);
+const cosD = d => Math.cos(d * DEG);
+
+function rgba(hex, a){
+  const n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + ((n>>16)&255) + ',' + ((n>>8)&255) + ',' + (n&255) + ',' + a + ')';
+}
+
+/* =========================================================
+   2. Astronomische Daten (J2000-Bahnelemente, JPL)
+   ========================================================= */
+const SUN = {
+  id:'sonne', name:'Sonne', isSun:true, kind:'Gelber Zwerg · G2V',
+  color:'#ffcc55', light:'#fff3c4', dark:'#c96a12',
+  stats:[
+    ['Radius','696.340 km'],
+    ['Masse','333.000 Erdmassen'],
+    ['Oberfläche','ca. 5.500 °C'],
+    ['Kern','ca. 15 Mio. °C'],
+    ['Anteil an der Systemmasse','99,86 %'],
+    ['Alter','ca. 4,6 Mrd. Jahre']
+  ],
+  fact:'In ihrem Kern verschmelzen pro Sekunde rund 600 Millionen Tonnen Wasserstoff zu Helium – dabei wird das Licht erzeugt, das alle Planeten hier beleuchtet.'
+};
+
+const BODIES = [
+  {
+    id:'merkur', name:'Merkur', kind:'Gesteinsplanet · 1. Planet',
+    a:0.38709927, e:0.20563593, peri:77.45779628, L:252.25032350, period:87.9691,
+    color:'#8f857b', light:'#d3c6b7', dark:'#39332d', size:2.4,
+    stats:[
+      ['Abstand','0,39 AE · 58 Mio. km'],
+      ['Radius','2.440 km'],
+      ['Masse','0,055 Erden'],
+      ['Tag','58,6 Erdtage'],
+      ['Jahr','88 Tage'],
+      ['Monde','0'],
+      ['Temperatur','−173 … 427 °C']
+    ],
+    fact:'Merkurs Eisenkern füllt rund 85 % seines Radius – der kleinste Planet ist fast ein reiner Metallkern.'
+  },
+  {
+    id:'venus', name:'Venus', kind:'Gesteinsplanet · 2. Planet',
+    a:0.72333566, e:0.00677672, peri:131.60246718, L:181.97909950, period:224.7008,
+    color:'#d8b871', light:'#f9e7b4', dark:'#6b5426', size:3.2,
+    bands:[
+      [-1,-0.45,'#e8d4a0'],
+      [-0.45,-0.05,'#f0e0b4'],
+      [0.05,0.45,'#e2ce98'],
+      [0.45,1,'#dcc68e']
+    ],
+    stats:[
+      ['Abstand','0,72 AE · 108 Mio. km'],
+      ['Radius','6.052 km'],
+      ['Masse','0,815 Erden'],
+      ['Tag','243 Erdtage (retrograd)'],
+      ['Jahr','225 Tage'],
+      ['Monde','0'],
+      ['Temperatur','ca. 462 °C']
+    ],
+    fact:'Venus dreht sich rückwärts – und ihr Tag ist länger als ihr Jahr. Die CO₂-Atmosphäre erzeugt mit 92 bar den stärksten Treibhauseffekt im Sonnensystem.'
+  },
+  {
+    id:'erde', name:'Erde', kind:'Gesteinsplanet · 3. Planet',
+    a:1.00000261, e:0.01671123, peri:102.93768193, L:100.46457166, period:365.2564,
+    color:'#2f6fc0', light:'#9fd0fa', dark:'#0e2b57', size:3.4,
+    land:[
+      [-0.18,-0.16, 0.34, 0.40, 0.5],
+      [ 0.30, 0.10, 0.40, 0.26, -0.3],
+      [-0.46, 0.40, 0.22, 0.24, 0.9],
+      [ 0.52,-0.44, 0.18, 0.20, 0.2]
+    ],
+    stats:[
+      ['Abstand','1,00 AE · 149,6 Mio. km'],
+      ['Radius','6.371 km'],
+      ['Masse','1 Erde'],
+      ['Tag','23 h 56 min'],
+      ['Jahr','365,26 Tage'],
+      ['Monde','1 (Mond)'],
+      ['Temperatur','Ø 15 °C']
+    ],
+    fact:'Der einzige bekannte Ort mit Leben – und der einzige Planet, der nicht nach einer Gottheit benannt ist.'
+  },
+  {
+    id:'mars', name:'Mars', kind:'Gesteinsplanet · 4. Planet',
+    a:1.52371034, e:0.09339410, peri:-23.94362959, L:-4.55343205, period:686.9796,
+    color:'#c1552f', light:'#f2a97e', dark:'#521c0c', size:2.9,
+    land:[
+      [-0.10,-0.30, 0.42, 0.24, 0.2],
+      [ 0.34, 0.26, 0.26, 0.30, -0.4],
+      [-0.40, 0.34, 0.18, 0.20, 0.6]
+    ],
+    landColor:'#8d4023',
+    caps:0.88,
+    stats:[
+      ['Abstand','1,52 AE · 228 Mio. km'],
+      ['Radius','3.390 km'],
+      ['Masse','0,107 Erden'],
+      ['Tag','24 h 37 min'],
+      ['Jahr','687 Tage'],
+      ['Monde','2 (Phobos, Deimos)'],
+      ['Temperatur','Ø −63 °C']
+    ],
+    fact:'Der Olympus Mons ist mit 22 km Höhe der höchste Vulkan des Sonnensystems – fast dreimal so hoch wie der Everest.'
+  },
+  {
+    id:'jupiter', name:'Jupiter', kind:'Gasriese · 5. Planet',
+    a:5.20288700, e:0.04838624, peri:14.72847983, L:34.39644051, period:4332.589,
+    color:'#c9a479', light:'#f3dfbe', dark:'#5e4426', size:6.6,
+    flat:0.93, gas:true,
+    bands:[
+      [-1.00,-0.82,'#9c8c7b'],
+      [-0.82,-0.66,'#cdbda2'],
+      [-0.66,-0.52,'#a1896f'],
+      [-0.52,-0.36,'#dfd1b5'],
+      [-0.36,-0.22,'#b3916f'],
+      [-0.22,-0.06,'#eaddc1'],
+      [-0.06, 0.10,'#f3e8ce'],
+      [ 0.10, 0.26,'#c39a76'],
+      [ 0.26, 0.42,'#e5d6b9'],
+      [ 0.42, 0.58,'#a98a6b'],
+      [ 0.58, 0.76,'#d7c6a5'],
+      [ 0.76, 1.00,'#9b8a78']
+    ],
+    spot:{ x:0.34, y:0.28, rx:0.30, ry:0.13, rot:-0.08, c1:'#c06a45', c2:'#a2522f' },
+    stats:[
+      ['Abstand','5,20 AE · 778 Mio. km'],
+      ['Radius','69.911 km'],
+      ['Masse','317,8 Erden'],
+      ['Tag','9 h 56 min'],
+      ['Jahr','11,86 Jahre'],
+      ['Monde','95 (4 große)'],
+      ['Temperatur','ca. −108 °C']
+    ],
+    fact:'Der Große Rote Fleck ist ein Sturm, der seit mindestens 350 Jahren tobt. Jupiter rotiert in unter 10 Stunden – deshalb ist er sichtbar abgeplattet.'
+  },
+  {
+    id:'saturn', name:'Saturn', kind:'Gasriese · 6. Planet',
+    a:9.53667594, e:0.05386179, peri:92.59887831, L:49.95424423, period:10759.22,
+    color:'#d3bd8a', light:'#f8eecd', dark:'#6a5a33', size:5.8,
+    flat:0.90, gas:true, ring:true,
+    bands:[
+      [-1.00,-0.62,'#d5c096'],
+      [-0.62,-0.22,'#e3d3aa'],
+      [-0.22, 0.20,'#efe4be'],
+      [ 0.20, 0.62,'#e1d0a4'],
+      [ 0.62, 1.00,'#cfba90']
+    ],
+    stats:[
+      ['Abstand','9,54 AE · 1,43 Mrd. km'],
+      ['Radius','58.232 km'],
+      ['Masse','95,2 Erden'],
+      ['Tag','10 h 33 min'],
+      ['Jahr','29,46 Jahre'],
+      ['Monde','274'],
+      ['Temperatur','ca. −139 °C']
+    ],
+    fact:'Saturn ist im Mittel so leicht, dass er in einem ausreichend großen Wasserbecken schwimmen würde. Seine Ringe sind nur 10 bis 100 Meter dick.'
+  },
+  {
+    id:'uranus', name:'Uranus', kind:'Eisriese · 7. Planet',
+    a:19.18916464, e:0.04725744, peri:170.95427630, L:313.23810451, period:30685.4,
+    color:'#8fd8e0', light:'#d4f7fa', dark:'#2f6b73', size:4.3,
+    flat:0.97,
+    bands:[
+      [-1,-0.5,'#96dbe2'],
+      [-0.5,0.5,'#a3e2e9'],
+      [0.5,1,'#8ad2da']
+    ],
+    stats:[
+      ['Abstand','19,19 AE · 2,87 Mrd. km'],
+      ['Radius','25.362 km'],
+      ['Masse','14,5 Erden'],
+      ['Tag','17 h 14 min (retrograd)'],
+      ['Jahr','84,01 Jahre'],
+      ['Monde','28'],
+      ['Temperatur','ca. −197 °C']
+    ],
+    fact:'Uranus rotiert auf der Seite: Seine Achse ist um 98° geneigt, wahrscheinlich nach einer frühen Kollision.'
+  },
+  {
+    id:'neptun', name:'Neptun', kind:'Eisriese · 8. Planet',
+    a:30.06992276, e:0.00859048, peri:44.96476227, L:-55.12002969, period:60189.0,
+    color:'#4a6fd4', light:'#9dbcf8', dark:'#152a63', size:4.1,
+    flat:0.97,
+    bands:[
+      [-1,-0.45,'#4468c9'],
+      [-0.45,0.45,'#5679dd'],
+      [0.45,1,'#3f61bf']
+    ],
+    stats:[
+      ['Abstand','30,07 AE · 4,50 Mrd. km'],
+      ['Radius','24.622 km'],
+      ['Masse','17,1 Erden'],
+      ['Tag','16 h 06 min'],
+      ['Jahr','164,8 Jahre'],
+      ['Monde','16'],
+      ['Temperatur','ca. −201 °C']
+    ],
+    fact:'Neptun wurde 1846 zuerst berechnet und dann gezielt am Himmel gefunden – ein Triumph der Himmelsmechanik.'
+  },
+  {
+    id:'pluto', name:'Pluto', kind:'Zwergplanet · Kuipergürtel', isDwarf:true,
+    a:39.482, e:0.2488, peri:224.068, L:238.929, period:90560.0,
+    color:'#b09a86', light:'#e6d6c4', dark:'#4a3e34', size:2.0,
+    stats:[
+      ['Abstand','39,5 AE (29,7 – 49,3 AE)'],
+      ['Radius','1.188 km'],
+      ['Masse','0,0022 Erden'],
+      ['Tag','6,4 Erdtage'],
+      ['Jahr','248 Jahre'],
+      ['Monde','5'],
+      ['Temperatur','ca. −229 °C']
+    ],
+    fact:'Pluto ist seit 2006 ein Zwergplanet. Sein Mond Charon ist halb so groß wie er selbst – die beiden umkreisen einen gemeinsamen Schwerpunkt.'
+  }
+];
+
+/* =========================================================
+   3. Monde
+   ---------------------------------------------------------
+   Alle Monde laufen auf echten Positionen:
+
+   Mond      : ELP-Hauptterme (Meeus Kap. 47), ±0,05°
+   Galileer  : mittlere Länge lon0 + n·t, kalibriert gegen
+               JPL Horizons (Vektoren, Jupiter-zentriert,
+               ekliptikales J2000-Frame).
+               Restfehler 2000–2060: höchstens 0,7°
+
+   dist/size = Darstellungsgrößen (Bahnradius gestaucht,
+               sonst läge Kallisto 26 Jupitermonde weit weg)
+   ========================================================= */
+const MOONS = [
+  { id:'mond', parent:'erde', name:'Mond', kind:'Trabant der Erde',
+    ephem:'elp', rKm:384400, period:27.3217, rate:13.17636,
+    dist:2.10, size:0.30,
+    color:'#c3bfb6', light:'#f0ece2', dark:'#5f5c55',
+    stats:[
+      ['Mittlerer Abstand','384.400 km'],
+      ['Radius','1.737 km'],
+      ['Masse','0,0123 Erden'],
+      ['Siderischer Umlauf','27,32 Tage'],
+      ['Temperatur','−173 … 127 °C']
+    ],
+    fact:'Der Mond stabilisiert die Neigung der Erdachse und damit unser Klima. Seit Apollo 11 (1969) haben zwölf Menschen seinen Boden betreten.'
+  },
+  { id:'io', parent:'jupiter', name:'Io', kind:'Trabant des Jupiter',
+    ephem:'gal', lon0:18.42, n:203.488955790, rate:203.488955790,
+    rKm:421700, period:1.769138,
+    dist:1.85, size:0.17,
+    color:'#d9c96a', light:'#fff2a8', dark:'#8a7420',
+    stats:[
+      ['Abstand','421.700 km'],
+      ['Radius','1.822 km'],
+      ['Masse','0,015 Erden'],
+      ['Umlauf','1,77 Tage'],
+      ['Besonderheit','über 400 Vulkane']
+    ],
+    fact:'Io ist der vulkanisch aktivste Körper im Sonnensystem – die Gezeitenkräfte Jupiters kneten seinen Kern wie ein Stück Teig.'
+  },
+  { id:'europa', parent:'jupiter', name:'Europa', kind:'Trabant des Jupiter',
+    ephem:'gal', lon0:213.02, n:101.374724735, rate:101.374724735,
+    rKm:671034, period:3.551181,
+    dist:2.60, size:0.16,
+    color:'#cfc8b8', light:'#f6f2e8', dark:'#8b8578',
+    stats:[
+      ['Abstand','671.100 km'],
+      ['Radius','1.561 km'],
+      ['Masse','0,008 Erden'],
+      ['Umlauf','3,55 Tage'],
+      ['Besonderheit','Eismond mit Ozean']
+    ],
+    fact:'Unter einer Kilometer dicken Eiskruste liegt ein Salzwasserozean mit mehr Wasser als alle irdischen Meere zusammen – ein Lieblingsziel der Astrobiologie.'
+  },
+  { id:'ganymed', parent:'jupiter', name:'Ganymed', kind:'Trabant des Jupiter',
+    ephem:'gal', lon0:219.81, n:50.317609207, rate:50.317609207,
+    rKm:1070412, period:7.154553,
+    dist:3.55, size:0.18,
+    color:'#a89b8a', light:'#ddd2c2', dark:'#6b6155',
+    stats:[
+      ['Abstand','1.070.400 km'],
+      ['Radius','2.634 km'],
+      ['Masse','0,025 Erden'],
+      ['Umlauf','7,15 Tage'],
+      ['Besonderheit','größter Mond']
+    ],
+    fact:'Ganymed ist größer als der Planet Merkur und der einzige Mond mit eigenem Magnetfeld.'
+  },
+  { id:'kallisto', parent:'jupiter', name:'Kallisto', kind:'Trabant des Jupiter',
+    ephem:'gal', lon0:79.42, n:21.571071177, rate:21.571071177,
+    rKm:1882709, period:16.689,
+    dist:4.80, size:0.17,
+    color:'#8b8075', light:'#c3b8aa', dark:'#544c44',
+    stats:[
+      ['Abstand','1.882.700 km'],
+      ['Radius','2.410 km'],
+      ['Masse','0,018 Erden'],
+      ['Umlauf','16,69 Tage'],
+      ['Besonderheit','älteste Kruste']
+    ],
+    fact:'Kallisto ist die am stärksten verkraterte Oberfläche, die wir kennen – seit vier Milliarden Jahren hat sich dort kaum etwas verändert.'
+  }
+];
+
+const ALL = [SUN, ...BODIES, ...MOONS];
+const BY_ID = {};
+ALL.forEach(b => BY_ID[b.id] = b);
+
+const MOONS_OF = {};
+MOONS.forEach(m => {
+  (MOONS_OF[m.parent] = MOONS_OF[m.parent] || []).push(m);
+});
+
+/* =========================================================
+   4. Zustand
+   ========================================================= */
+const J2000 = Date.UTC(2000, 0, 1, 12, 0, 0);
+const nowDays = () => (Date.now() - J2000) / 86400000;
+
+const LOGR = 0.35;
+const LOG_REF = Math.log(1 + 1 / LOGR);
+
+const state = {
+  t: nowDays(),
+  playing: true,
+  dir: 1,
+  speed: 15,
+  zoom: 1,
+  panX: 0, panY: 0,
+  hover: null, selected: null,
+  showOrbits: true, showLabels: true, showTrails: true,
+  showDwarfs: true, showBelt: true, trueScale: false,
+  sizeMul: 1,
+  base: 1,
+  dTw: 0,          /* Zeitfortschritt der letzten Frame in Tagen */
+  jump: false
+};
+
+function project(r){
+  if (state.trueScale) return r;
+  return Math.log(1 + r / LOGR) / LOG_REF;
+}
+
+/* =========================================================
+   5. Kepler-Mechanik
+   ========================================================= */
+function solveKepler(M, e){
+  M = ((M % TAU) + TAU) % TAU;
+  let E = M + e * Math.sin(M) + 0.5 * e * e * Math.sin(2 * M);
+  for (let i = 0; i < 12; i++){
+    const dE = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E));
+    E -= dE;
+    if (Math.abs(dE) < 1e-10) break;
+  }
+  return E;
+}
+
+function bodyWorld(b, t){
+  const M = (b.L - b.peri) * DEG + TAU * (t / b.period);
+  const E = solveKepler(M, b.e);
+  const r = b.a * (1 - b.e * Math.cos(E));
+  const v = Math.atan2(Math.sqrt(1 - b.e * b.e) * Math.sin(E), Math.cos(E) - b.e);
+  const lam = v + b.peri * DEG;
+  const R = project(r);
+  return { x: R * Math.cos(lam), y: R * Math.sin(lam) };
+}
+
+function bodyLon(b, t){
+  const M = (b.L - b.peri) * DEG + TAU * (t / b.period);
+  const E = solveKepler(M, b.e);
+  const v = Math.atan2(Math.sqrt(1 - b.e * b.e) * Math.sin(E), Math.cos(E) - b.e);
+  return norm360(v / DEG + b.peri);
+}
+
+function buildPath(b){
+  const N = 280, pts = [];
+  for (let i = 0; i <= N; i++){
+    const E = i / N * TAU;
+    const r = b.a * (1 - b.e * Math.cos(E));
+    const v = Math.atan2(Math.sqrt(1 - b.e * b.e) * Math.sin(E), Math.cos(E) - b.e);
+    const lam = v + b.peri * DEG;
+    const R = project(r);
+    pts.push(R * Math.cos(lam), R * Math.sin(lam));
+  }
+  b.path = pts;
+}
+
+/* =========================================================
+   6. Erdmond: echte Ephemeride (ELP-Hauptterme, Meeus 47)
+   ========================================================= */
+const MOON_MEAN_DIST = 384400;
+
+function moonEphem(t){
+  const T = t / 36525;
+  const Lp = 218.3164477 + 481267.88123421*T - 0.0015786*T*T;
+  const D  = 297.8501921 + 445267.1114034*T - 0.0018819*T*T;
+  const M  = 357.5291092 + 35999.0502909*T - 0.0001536*T*T;
+  const Mp = 134.9633964 + 477198.8675055*T + 0.0087414*T*T;
+  const F  = 93.2720950 + 483202.0175233*T - 0.0036539*T*T;
+
+  const d2 = 2*D, m2 = 2*Mp, f2 = 2*F;
+
+  const lon = Lp
+    + 6.288774*sinD(Mp)
+    + 1.274027*sinD(d2 - Mp)
+    + 0.658314*sinD(d2)
+    + 0.213618*sinD(m2)
+    - 0.185116*sinD(M)
+    - 0.114332*sinD(f2)
+    + 0.058793*sinD(d2 - m2)
+    + 0.057066*sinD(d2 - M - Mp)
+    + 0.053322*sinD(d2 + Mp)
+    + 0.045758*sinD(d2 - M)
+    - 0.040923*sinD(M - Mp)
+    - 0.034720*sinD(D)
+    - 0.030383*sinD(M + Mp)
+    + 0.015327*sinD(d2 - f2)
+    - 0.012528*sinD(Mp + f2)
+    + 0.010980*sinD(Mp - f2)
+    + 0.010675*sinD(2*d2 - Mp)
+    + 0.010034*sinD(3*Mp)
+    + 0.008548*sinD(2*d2 - m2)
+    - 0.007888*sinD(d2 + M - Mp)
+    - 0.006766*sinD(d2 + M)
+    - 0.005163*sinD(D - Mp)
+    + 0.004987*sinD(D + M)
+    + 0.004036*sinD(d2 - M + Mp)
+    + 0.003994*sinD(d2 + m2)
+    + 0.003861*sinD(2*d2)
+    + 0.003665*sinD(d2 - 3*Mp);
+
+  const dist = 385000.56 + (
+      -20905355*cosD(Mp)
+     -  3699111*cosD(d2 - Mp)
+     -  2955968*cosD(d2)
+     -   569925*cosD(m2)
+     +    48888*cosD(M)
+     -     3149*cosD(f2)
+     +   246158*cosD(d2 - m2)
+     -   152138*cosD(d2 - M - Mp)
+     -   170733*cosD(d2 + Mp)
+     -   204586*cosD(d2 - M)
+     -   129620*cosD(M - Mp)
+     +   108743*cosD(D)
+     +   104755*cosD(M + Mp)
+     +    10321*cosD(d2 - f2)
+     +    79661*cosD(Mp - f2)
+     -    34782*cosD(2*d2 - Mp)
+     -    23210*cosD(3*Mp)
+     -    21636*cosD(2*d2 - m2)
+  ) / 1000;
+
+  return { lon: norm360(lon - 1.396971 * T), dist: dist };
+}
+
+/* =========================================================
+   7. Einheitlicher Mondzustand
+   ========================================================= */
+function moonState(m, t){
+  if (m.ephem === 'gal'){
+    return { lon: norm360(m.lon0 + m.n * t), rKm: m.rKm };
+  }
+  const e = moonEphem(t);
+  return { lon: e.lon, rKm: e.dist };
+}
+
+function phaseName(p){
+  if (p < 5 || p > 355) return 'Neumond';
+  if (p < 85)  return 'zunehmende Sichel';
+  if (p < 95)  return 'zunehmender Halbmond';
+  if (p < 175) return 'zunehmender Dreiviertelmond';
+  if (p < 185) return 'Vollmond';
+  if (p < 265) return 'abnehmender Dreiviertelmond';
+  if (p < 275) return 'abnehmender Halbmond';
+  return 'abnehmende Sichel';
+}
+
+let moonLive = { lon: 0, dist: MOON_MEAN_DIST, psi: 0, illum: 0.5 };
+
+function updateMoonLive(){
+  const e = moonEphem(state.t);
+  const sunLon = norm360(bodyLon(BY_ID.erde, state.t) + 180);
+  const psi = norm360(e.lon - sunLon);
+  moonLive = {
+    lon: e.lon,
+    dist: e.dist,
+    psi: psi,
+    illum: (1 - Math.cos(psi * DEG)) / 2
+  };
+}
+
+/* =========================================================
+   8. Datum ⇄ Tage seit J2000
+   ========================================================= */
+function daysFromYMD(y, m, d){
+  const dt = new Date(Date.UTC(2000, 0, 1, 12, 0, 0));
+  dt.setUTCFullYear(y, m - 1, d);
+  return (dt.getTime() - J2000) / 86400000;
+}
+function ymdString(d){
+  const y = d.getUTCFullYear();
+  const ys = y < 0 ? '-' + String(-y).padStart(4, '0') : String(y).padStart(4, '0');
+  return ys + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' +
+         String(d.getUTCDate()).padStart(2, '0');
+}
+const dateAt = () => new Date(J2000 + state.t * 86400000);
+
+/* =========================================================
+   9. Canvas & Kamera
+   ========================================================= */
+const cv = document.getElementById('sky');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, skyGrad = null, vscale = 1;
+let stars = [];
+let belt = [], kuiper = [];
+let positions = {};
+
+const w2s = (x, y) => {
+  const s = state.base * state.zoom;
+  return { x: W/2 + state.panX + x*s, y: H/2 + state.panY - y*s };
+};
+const s2w = (sx, sy) => {
+  const s = state.base * state.zoom;
+  return { x: (sx - W/2 - state.panX)/s, y: -(sy - H/2 - state.panY)/s };
+};
+
+function computeBase(){
+  const maxA = state.showDwarfs ? 49.6 : 30.6;
+  const worldMax = project(maxA) * 1.06;
+  const pad = Math.min(W, H) < 620 ? 30 : 44;
+  state.base = Math.max(0.001, Math.min(W, H) / 2 - pad) / worldMax;
+}
+
+function makeStars(){
+  stars = [];
+  const n = Math.round((W * H) / 2400);
+  for (let i = 0; i < n; i++){
+    stars.push({
+      x: Math.random(), y: Math.random(),
+      r: Math.random() < 0.88 ? (Math.random() * 0.9 + 0.4) : (Math.random() * 1.4 + 1.0),
+      a: 0.18 + Math.random() * 0.62,
+      ph: Math.random() * TAU,
+      sp: 0.4 + Math.random() * 1.6,
+      tint: Math.random()
+    });
+  }
+}
+
+function makeBelts(){
+  belt = [];
+  for (let i = 0; i < 780; i++){
+    const a = 2.08 + Math.pow(Math.random(), 0.85) * 1.25;
+    belt.push({
+      a, ph: Math.random() * TAU, e: Math.random() * 0.14,
+      s: Math.random() * 1.2 + 0.5, al: 0.18 + Math.random() * 0.45
+    });
+  }
+  kuiper = [];
+  for (let i = 0; i < 620; i++){
+    const a = 30 + Math.pow(Math.random(), 0.7) * 19;
+    kuiper.push({
+      a, ph: Math.random() * TAU, e: Math.random() * 0.12,
+      s: Math.random() * 1.0 + 0.4, al: 0.08 + Math.random() * 0.22
+    });
+  }
+}
+
+function resize(){
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W * DPR);
+  cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  vscale = clamp(Math.min(W, H) / 820, 0.80, 1.35);
+
+  skyGrad = ctx.createRadialGradient(W*0.5, H*0.44, 0, W*0.5, H*0.44, Math.max(W, H) * 0.85);
+  skyGrad.addColorStop(0, '#0a1128');
+  skyGrad.addColorStop(0.45, '#060a18');
+  skyGrad.addColorStop(1, '#02030a');
+
+  makeStars();
+  computeBase();
+}
+
+/* =========================================================
+   10. Größenlogik
+   ========================================================= */
+function planetRadius(b){
+  const v = vscale * state.sizeMul;
+  const z = Math.pow(state.zoom, 0.28);
+  if (state.trueScale) return Math.max(2.4 * v, b.size * 1.15 * v * z);
+  return Math.max(3.6 * v, b.size * 2.05 * v * z);
+}
+function sunRadius(){
+  if (state.trueScale)
+    return clamp(9 * vscale * Math.pow(state.zoom, 0.22), 5, 52);
+  return clamp(20 * vscale * Math.pow(state.zoom, 0.18), 11, 96);
+}
+
+/* =========================================================
+   11. Zeichnen – Grundgerüst
+   ========================================================= */
+function drawStars(time){
+  for (let i = 0; i < stars.length; i++){
+    const s = stars[i];
+    const tw = 0.72 + 0.28 * Math.sin(time * s.sp + s.ph);
+    const x = s.x * W, y = s.y * H;
+    ctx.fillStyle = s.tint > 0.82
+      ? 'rgba(190,210,255,' + (s.a * tw) + ')'
+      : (s.tint < 0.14 ? 'rgba(255,226,198,' + (s.a * tw) + ')'
+                       : 'rgba(232,240,255,' + (s.a * tw) + ')');
+    if (s.r > 1.15){
+      ctx.beginPath();
+      ctx.arc(x, y, s.r, 0, TAU);
+      ctx.fill();
+    } else {
+      ctx.fillRect(x, y, s.r, s.r);
+    }
+  }
+}
+
+function drawDust(list, colorPrefix, alphaMul){
+  const s = state.base * state.zoom;
+  const cx = W/2 + state.panX, cy = H/2 + state.panY;
+  for (let i = 0; i < list.length; i++){
+    const k = list[i];
+    const lam = k.ph + TAU * (state.t / (365.25 * Math.pow(k.a, 1.5)));
+    const R = project(k.a * (1 - k.e * Math.cos(lam)));
+    const x = cx + R * Math.cos(lam) * s;
+    const y = cy - R * Math.sin(lam) * s;
+    if (x < -6 || x > W + 6 || y < -6 || y > H + 6) continue;
+    ctx.fillStyle = colorPrefix + (k.al * alphaMul) + ')';
+    ctx.fillRect(x, y, k.s, k.s);
+  }
+}
+
+function drawOrbits(){
+  for (const b of BODIES){
+    if (b.isDwarf && !state.showDwarfs) continue;
+    const p = b.path;
+    const active = (state.hover === b.id || state.selected === b.id);
+    ctx.beginPath();
+    for (let i = 0; i < p.length; i += 2){
+      const s = w2s(p[i], p[i+1]);
+      if (i === 0) ctx.moveTo(s.x, s.y); else ctx.lineTo(s.x, s.y);
+    }
+    ctx.closePath();
+    ctx.lineWidth = active ? 1.5 : 1;
+    ctx.strokeStyle = rgba(b.light, active ? 0.55 : 0.19);
+    ctx.stroke();
+  }
+}
+
+function drawTrail(b){
+  const span = b.period * 0.16 * state.dir;
+  const N = 16;
+  const start = bodyWorld(b, state.t);
+  let prev = w2s(start.x, start.y);
+  const baseW = clamp(planetRadius(b) * 0.42, 0.9, 4.5);
+
+  ctx.lineCap = 'round';
+  for (let i = 1; i <= N; i++){
+    const q = bodyWorld(b, state.t - span * i / N);
+    const s = w2s(q.x, q.y);
+    const f = 1 - i / N;
+    ctx.strokeStyle = rgba(b.light, 0.40 * f * f);
+    ctx.lineWidth = baseW * f;
+    ctx.beginPath();
+    ctx.moveTo(prev.x, prev.y);
+    ctx.lineTo(s.x, s.y);
+    ctx.stroke();
+    prev = s;
+  }
+}
+
+/* =========================================================
+   12. Planetenkörper
+   ========================================================= */
+function drawDisc(b, sx, sy, r, sunS){
+  const flat = b.flat || 1;
+  const ry = r * flat;
+  const ang = Math.atan2(sunS.y - sy, sunS.x - sx);
+  const dx = Math.cos(ang), dy = Math.sin(ang);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, r, ry, 0, 0, TAU);
+  ctx.clip();
+
+  const base = ctx.createRadialGradient(
+    sx + dx * r * 0.42, sy + dy * ry * 0.42, r * 0.06,
+    sx + dx * r * 0.10, sy + dy * ry * 0.10, r * 1.45
+  );
+  base.addColorStop(0, b.light);
+  base.addColorStop(0.46, b.color);
+  base.addColorStop(1, b.dark);
+  ctx.fillStyle = base;
+  ctx.fillRect(sx - r, sy - ry, r * 2, ry * 2);
+
+  if (b.bands){
+    for (let i = 0; i < b.bands.length; i++){
+      const bd = b.bands[i];
+      const y0 = sy + bd[0] * ry;
+      const y1 = sy + bd[1] * ry;
+      const mid = (y0 + y1) / 2;
+      const bulge = 1 + 0.10 * Math.abs((mid - sy) / ry);
+      ctx.fillStyle = bd[2];
+      ctx.fillRect(sx - r * bulge, Math.min(y0, y1) - 0.4, r * 2 * bulge, Math.abs(y1 - y0) + 0.8);
+    }
+  }
+
+  if (b.spot){
+    const sp = b.spot;
+    ctx.save();
+    ctx.translate(sx + sp.x * r, sy + sp.y * ry);
+    ctx.rotate(sp.rot);
+    const gs = ctx.createRadialGradient(0, 0, 0, 0, 0, sp.rx * r);
+    gs.addColorStop(0, sp.c1);
+    gs.addColorStop(1, sp.c2);
+    ctx.fillStyle = gs;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, sp.rx * r, sp.ry * r, 0, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if (b.land){
+    ctx.fillStyle = b.landColor || '#3f7d4e';
+    for (let i = 0; i < b.land.length; i++){
+      const l = b.land[i];
+      ctx.beginPath();
+      ctx.ellipse(sx + l[0] * r, sy + l[1] * ry, l[2] * r, l[3] * ry, l[4], 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  if (b.caps){
+    ctx.fillStyle = 'rgba(244,250,255,' + b.caps + ')';
+    ctx.beginPath();
+    ctx.ellipse(sx, sy - ry * 0.90, r * 0.52, ry * 0.16, 0, 0, TAU);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(sx, sy + ry * 0.90, r * 0.46, ry * 0.14, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  const term = ctx.createLinearGradient(
+    sx + dx * r * 0.62, sy + dy * ry * 0.62,
+    sx - dx * r * 1.20, sy - dy * ry * 1.20
+  );
+  term.addColorStop(0, 'rgba(255,255,255,' + (b.gas ? 0.06 : 0.14) + ')');
+  term.addColorStop(0.52, 'rgba(0,0,0,0)');
+  term.addColorStop(1, 'rgba(0,0,0,0.74)');
+  ctx.fillStyle = term;
+  ctx.fillRect(sx - r, sy - ry, r * 2, ry * 2);
+
+  const limb = ctx.createRadialGradient(sx, sy, r * 0.62, sx, sy, r * 1.02);
+  limb.addColorStop(0, 'rgba(0,0,0,0)');
+  limb.addColorStop(1, 'rgba(0,0,0,0.30)');
+  ctx.fillStyle = limb;
+  ctx.fillRect(sx - r, sy - ry, r * 2, ry * 2);
+
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.ellipse(sx, sy, r, ry, 0, 0, TAU);
+  ctx.strokeStyle = rgba(b.dark, 0.62);
+  ctx.lineWidth = Math.max(0.6, r * 0.075);
+  ctx.stroke();
+}
+
+/* =========================================================
+   13. Saturnringe
+   ========================================================= */
+const RING_TILT = -0.36;
+const RING_SQUASH = 0.36;
+const RING_BANDS = [
+  [1.24, 1.52, 158, 146, 126, 0.30],
+  [1.53, 1.94, 232, 218, 186, 0.82],
+  [2.02, 2.18, 205, 191, 160, 0.64],
+  [2.21, 2.26, 198, 184, 154, 0.58],
+  [2.32, 2.37, 176, 166, 146, 0.20]
+];
+
+function drawRings(sx, sy, r, back){
+  ctx.save();
+  ctx.translate(sx, sy);
+  ctx.rotate(RING_TILT);
+
+  const a0 = back ? Math.PI : 0;
+  const a1 = back ? TAU : Math.PI;
+  const dim = back ? 0.66 : 1;
+
+  for (let i = 0; i < RING_BANDS.length; i++){
+    const rb = RING_BANDS[i];
+    const ro = rb[1] * r, ri = rb[0] * r;
+    if (ro < 1.2) continue;
+
+    ctx.beginPath();
+    ctx.ellipse(0, 0, ro, ro * RING_SQUASH, 0, a0, a1, false);
+    ctx.ellipse(0, 0, ri, ri * RING_SQUASH, 0, a1, a0, true);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(' + rb[2] + ',' + rb[3] + ',' + rb[4] + ',' + (rb[5] * dim) + ')';
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/* =========================================================
+   14. Sonne
+   ========================================================= */
+function drawSun(time){
+  const s = w2s(0, 0);
+  const r = sunRadius();
+  const pulse = 1 + 0.03 * Math.sin(time * 1.6);
+
+  const gr = r * 6 * pulse;
+  const g = ctx.createRadialGradient(s.x, s.y, r * 0.92, s.x, s.y, gr);
+  g.addColorStop(0,    'rgba(255,244,205,.92)');
+  g.addColorStop(0.13, 'rgba(255,214,130,.40)');
+  g.addColorStop(0.34, 'rgba(255,158,60,.13)');
+  g.addColorStop(0.66, 'rgba(255,120,30,.042)');
+  g.addColorStop(1,    'rgba(255,90,20,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, gr, 0, TAU);
+  ctx.fill();
+
+  const core = ctx.createRadialGradient(
+    s.x - r * 0.26, s.y - r * 0.26, r * 0.05,
+    s.x, s.y, r
+  );
+  core.addColorStop(0,    '#ffffff');
+  core.addColorStop(0.48, '#fff4c8');
+  core.addColorStop(0.84, '#ffcf6e');
+  core.addColorStop(1,    '#f6a338');
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, r, 0, TAU);
+  ctx.fill();
+
+  positions.sonne = { sx: s.x, sy: s.y, r };
+}
+
+/* =========================================================
+   15. Monde mit Bewegungsspur
+   ---------------------------------------------------------
+   Bei hoher Simulationsgeschwindigkeit überstreicht z. B. Io
+   mehrere zehntausend Grad pro Sekunde. Statt eines flackernden
+   Punktes wird die in der letzten Frame tatsächlich durchlaufene
+   Bahnstrecke gezeichnet – bei extremem Tempo ein ganzer Ring.
+   ========================================================= */
+function drawMoonSmear(px, py, orbR, angNow, sweep, color, width){
+  const sw = Math.abs(sweep);
+
+  if (sw >= TAU){
+    ctx.beginPath();
+    ctx.arc(px, py, orbR, 0, TAU);
+    ctx.strokeStyle = rgba(color, 0.26);
+    ctx.lineWidth = Math.max(1, width * 0.85);
+    ctx.stroke();
+    return;
+  }
+
+  const N = 14;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < N; i++){
+    const a0 = angNow - sweep + sweep * (i / N);
+    const a1 = angNow - sweep + sweep * ((i + 1) / N);
+    const f = (i + 1) / N;
+    ctx.strokeStyle = rgba(color, 0.40 * f * f);
+    ctx.lineWidth = Math.max(0.75, width * f);
+    ctx.beginPath();
+    ctx.moveTo(px + Math.cos(a0) * orbR, py - Math.sin(a0) * orbR);
+    ctx.lineTo(px + Math.cos(a1) * orbR, py - Math.sin(a1) * orbR);
+    ctx.stroke();
+  }
+}
+
+function drawMoons(parent, px, py, pr){
+  const list = MOONS_OF[parent.id];
+  if (!list) return;
+  const showPaths = state.showOrbits && state.zoom > 1.7;
+
+  for (let i = 0; i < list.length; i++){
+    const m = list[i];
+    const st = moonState(m, state.t);
+
+    const orbR = (m.ephem === 'elp')
+      ? pr * m.dist * (st.rKm / MOON_MEAN_DIST)
+      : pr * m.dist;
+
+    const ang = st.lon * DEG;
+    const mx = px + Math.cos(ang) * orbR;
+    const my = py - Math.sin(ang) * orbR;
+    const mr = Math.max(1.4 * vscale, pr * m.size);
+
+    if (showPaths){
+      ctx.beginPath();
+      ctx.arc(px, py, orbR, 0, TAU);
+      ctx.strokeStyle = rgba(m.light, 0.15);
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+
+    /* Bewegungsspur: Winkelüberstreichung der letzten Frame */
+    if (state.dTw){
+      const sweep = (m.rate * DEG) * state.dTw;
+      if (Math.abs(sweep) > 0.015){
+        drawMoonSmear(px, py, orbR, ang, sweep, m.light, mr);
+      }
+    }
+
+    positions[m.id] = { sx: mx, sy: my, r: mr };
+
+    const hot = (state.hover === m.id || state.selected === m.id);
+    const g = ctx.createRadialGradient(
+      mx - mr * 0.35, my - mr * 0.35, mr * 0.05,
+      mx, my, mr * 1.15
+    );
+    g.addColorStop(0, m.light);
+    g.addColorStop(1, m.dark);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(mx, my, mr, 0, TAU);
+    ctx.fill();
+
+    if (hot){
+      ctx.beginPath();
+      ctx.arc(mx, my, mr + 4, 0, TAU);
+      ctx.strokeStyle = rgba(m.light, 0.85);
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+    }
+  }
+}
+
+/* =========================================================
+   16. Körper, Labels, Render
+   ========================================================= */
+function drawBodies(){
+  const sunS = w2s(0, 0);
+
+  for (const b of BODIES){
+    if (b.isDwarf && !state.showDwarfs) continue;
+
+    const q = bodyWorld(b, state.t);
+    const s = w2s(q.x, q.y);
+    const r = planetRadius(b);
+    positions[b.id] = { sx: s.x, sy: s.y, r };
+
+    if (state.showTrails) drawTrail(b);
+
+    const gl = ctx.createRadialGradient(s.x, s.y, r * 0.75, s.x, s.y, r * 2.7);
+    gl.addColorStop(0, rgba(b.light, 0.18));
+    gl.addColorStop(1, rgba(b.light, 0));
+    ctx.fillStyle = gl;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, r * 2.7, 0, TAU);
+    ctx.fill();
+
+    if (b.ring) drawRings(s.x, s.y, r, true);
+    drawDisc(b, s.x, s.y, r, sunS);
+    if (b.ring) drawRings(s.x, s.y, r, false);
+
+    if (state.hover === b.id || state.selected === b.id){
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, r + 7, 0, TAU);
+      ctx.strokeStyle = rgba(b.light, 0.75);
+      ctx.lineWidth = 1.3;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    drawMoons(b, s.x, s.y, r);
+  }
+}
+
+function drawLabels(){
+  if (!state.showLabels) return;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'rgba(0,0,0,.92)';
+  ctx.shadowBlur = 6;
+
+  ctx.font = '600 11px ui-sans-serif,system-ui,-apple-system,sans-serif';
+  for (const b of BODIES){
+    if (b.isDwarf && !state.showDwarfs) continue;
+    const p = positions[b.id];
+    if (!p) continue;
+    const hot = (state.hover === b.id || state.selected === b.id);
+    ctx.fillStyle = hot ? '#ffffff' : 'rgba(202,216,247,.62)';
+    ctx.fillText(b.name, p.sx + p.r + 7, p.sy);
+  }
+
+  if (positions.sonne){
+    ctx.fillStyle = 'rgba(255,226,170,.82)';
+    ctx.fillText('Sonne', positions.sonne.sx + positions.sonne.r + 9, positions.sonne.sy);
+  }
+
+  ctx.font = '500 9.5px ui-sans-serif,system-ui,sans-serif';
+  for (const m of MOONS){
+    const p = positions[m.id];
+    if (!p) continue;
+    const hot = (state.hover === m.id || state.selected === m.id);
+    if (!hot && state.zoom < 2.3) continue;
+    ctx.fillStyle = hot ? '#ffffff' : 'rgba(196,210,240,.52)';
+    ctx.fillText(m.name, p.sx + p.r + 4, p.sy);
+  }
+
+  ctx.shadowBlur = 0;
+}
+
+function render(time){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = skyGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  updateMoonLive();
+
+  drawStars(time);
+  if (state.showBelt) drawDust(belt, 'rgba(176,186,210,', 1);
+  if (state.showBelt && state.showDwarfs) drawDust(kuiper, 'rgba(150,170,220,', 1);
+  if (state.showOrbits) drawOrbits();
+
+  positions = {};
+  drawSun(time);
+  drawBodies();
+  drawLabels();
+}
+
+/* =========================================================
+   17. Mondphasen-Symbol
+   ========================================================= */
+function drawPhaseIcon(cvs){
+  if (!cvs) return;
+  const g = cvs.getContext('2d');
+  const s = cvs.width;
+  const r = s * 0.42, cx = s / 2, cy = s / 2;
+
+  g.clearRect(0, 0, s, s);
+  g.beginPath();
+  g.arc(cx, cy, r, 0, TAU);
+  g.fillStyle = '#171d2c';
+  g.fill();
+
+  const psi = moonLive.psi * DEG;
+  const a = r * Math.abs(Math.cos(psi));
+  const gibbous = Math.cos(psi) < 0;
+
+  g.save();
+  g.beginPath();
+  g.arc(cx, cy, r, -Math.PI/2, Math.PI/2, false);
+  g.ellipse(cx, cy, a, r, 0, Math.PI/2, -Math.PI/2, gibbous ? false : true);
+  g.closePath();
+  const gr = g.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+  gr.addColorStop(0, '#fdf9ec');
+  gr.addColorStop(1, '#cfc7b3');
+  g.fillStyle = gr;
+  g.fill();
+  g.restore();
+
+  g.beginPath();
+  g.arc(cx, cy, r, 0, TAU);
+  g.strokeStyle = 'rgba(200,215,245,.35)';
+  g.lineWidth = Math.max(1, s * 0.012);
+  g.stroke();
+}
+
+/* =========================================================
+   18. Info-Panel & Chips
+   ========================================================= */
+const infoEl = document.getElementById('info');
+const chipsEl = document.getElementById('chips');
+
+const CHIP_ORDER = [
+  'sonne','merkur','venus','erde','mond','mars',
+  'jupiter','io','europa','ganymed','kallisto',
+  'saturn','uranus','neptun','pluto'
+];
+
+function buildChips(){
+  chipsEl.innerHTML = '';
+  for (const id of CHIP_ORDER){
+    const b = BY_ID[id];
+    if (!b) continue;
+    const el = document.createElement('button');
+    el.className = 'chip' + (b.parent ? ' moon' : '');
+    el.dataset.id = id;
+    el.innerHTML = '<i style="--c:' + b.light + '"></i>' + b.name;
+    el.addEventListener('click', () => select(id));
+    chipsEl.appendChild(el);
+  }
+}
+
+function updateChips(){
+  const kids = chipsEl.children;
+  for (let i = 0; i < kids.length; i++){
+    kids[i].classList.toggle('on', kids[i].dataset.id === state.selected);
+  }
+}
+
+function select(id){
+  if (id && state.selected === id) id = null;
+  const b = id ? BY_ID[id] : null;
+  if (b && b.isDwarf && !state.showDwarfs){
+    document.getElementById('optDwarfs').checked = true;
+    state.showDwarfs = true;
+    refit();
+  }
+  state.selected = id;
+  renderInfo();
+  updateChips();
+}
+
+function fmtNum(n, dec){
+  return n.toLocaleString('de-DE', {
+    minimumFractionDigits: dec, maximumFractionDigits: dec
+  });
+}
+
+function renderInfo(){
+  const b = state.selected ? BY_ID[state.selected] : null;
+  if (!b){
+    infoEl.classList.remove('show');
+    return;
+  }
+  const rows = b.stats.map(s =>
+    '<div><span>' + s[0] + '</span><b>' + s[1] + '</b></div>'
+  ).join('');
+
+  let extra = '';
+  let note = '';
+
+  if (b.id === 'mond'){
+    extra =
+      '<div class="lbl">Aktuell</div>' +
+      '<div class="moonwrap">' +
+        '<canvas id="phaseIcon" width="120" height="120"></canvas>' +
+        '<div class="phbig" id="phName">—</div>' +
+      '</div>' +
+      '<div class="grid">' +
+        '<div><span>Abstand</span><b id="lvDist">—</b></div>' +
+        '<div><span>Beleuchtet</span><b id="lvIllum">—</b></div>' +
+        '<div><span>Mondalter</span><b id="lvAge">—</b></div>' +
+        '<div><span>Elongation</span><b id="lvElong">—</b></div>' +
+      '</div>';
+    note = '<p class="note">Position aus der ELP-Ephemeride (Länge ±0,05°, ' +
+      'Abstand ±250 km). Der gezeichnete Bahnradius ist gestaucht – real ' +
+      'sind es rund 60 Erddurchmesser.</p>';
+  } else if (b.parent === 'jupiter'){
+    extra =
+      '<div class="lbl">Aktuell</div>' +
+      '<div class="grid">' +
+        '<div><span>Winkel um Jupiter</span><b id="lvLon">—</b></div>' +
+        '<div><span>Abstand Jupiter</span><b id="lvDist">—</b></div>' +
+        '<div><span>Umlaufzeit</span><b>' + fmtNum(b.period, 2) + ' Tage</b></div>' +
+      '</div>';
+    note = '<p class="note">Position aus mittlerer Länge λ₀ + n·t, kalibriert ' +
+      'gegen JPL Horizons. Restfehler 2000–2060 unter 0,7° – das sind ' +
+      'weniger als ein Pixel.</p>';
+  }
+
+  infoEl.style.setProperty('--c', b.light);
+  infoEl.innerHTML =
+    '<button class="x" id="infoClose" aria-label="Schließen">×</button>' +
+    '<div class="head"><span class="dot"></span><h2 style="color:' + b.light + '">' + b.name + '</h2></div>' +
+    '<div class="kind">' + b.kind + '</div>' +
+    '<div class="grid">' + rows + '</div>' +
+    extra +
+    note +
+    '<p class="fact">' + b.fact + '</p>';
+  infoEl.classList.add('show');
+  document.getElementById('infoClose').addEventListener('click', () => select(null));
+
+  if (b.id === 'mond') drawPhaseIcon(document.getElementById('phaseIcon'));
+  updateMoonCard();
+}
+
+function updateMoonCard(){
+  const b = state.selected ? BY_ID[state.selected] : null;
+  if (!b || !b.parent) return;
+
+  const elDist = document.getElementById('lvDist');
+  if (!elDist) return;
+
+  const st = moonState(b, state.t);
+
+  if (b.id === 'mond'){
+    elDist.textContent = fmtNum(st.rKm, 0) + ' km';
+    const elI = document.getElementById('lvIllum');
+    const elA = document.getElementById('lvAge');
+    const elE = document.getElementById('lvElong');
+    const elP = document.getElementById('phName');
+    if (elI) elI.textContent = fmtNum(moonLive.illum * 100, 1) + ' %';
+    if (elA) elA.textContent = fmtNum(moonLive.psi / 360 * 29.5306, 1) + ' Tage';
+    if (elE) elE.textContent = fmtNum(moonLive.psi, 1) + '°';
+    if (elP) elP.textContent = phaseName(moonLive.psi);
+    drawPhaseIcon(document.getElementById('phaseIcon'));
+  } else {
+    elDist.textContent = fmtNum(st.rKm, 0) + ' km';
+    const elL = document.getElementById('lvLon');
+    if (elL) elL.textContent = fmtNum(st.lon, 1) + '°';
+  }
+}
+
+/* =========================================================
+   19. Interaktion
+   ========================================================= */
+const mouse = { x: -999, y: -999 };
+let dragging = false, dragMoved = 0, lastPt = null;
+
+function hitTest(x, y){
+  let best = null, bd = 1e9;
+
+  const consider = (id, minTh) => {
+    const p = positions[id];
+    if (!p) return;
+    const d = Math.hypot(p.sx - x, p.sy - y);
+    const th = Math.max(minTh, p.r + 9);
+    if (d < th && d < bd){ bd = d; best = id; }
+  };
+
+  for (let i = 0; i < BODIES.length; i++){
+    const b = BODIES[i];
+    if (b.isDwarf && !state.showDwarfs) continue;
+    consider(b.id, 17);
+  }
+  for (let i = 0; i < MOONS.length; i++) consider(MOONS[i].id, 11);
+
+  const s = positions.sonne;
+  if (s){
+    const d = Math.hypot(s.sx - x, s.sy - y);
+    if (d < Math.max(30, s.r + 10) && d < bd){ bd = d; best = 'sonne'; }
+  }
+  return best;
+}
+
+function updateHover(){
+  state.hover = hitTest(mouse.x, mouse.y);
+  if (!dragging) cv.style.cursor = state.hover ? 'pointer' : 'grab';
+}
+
+cv.addEventListener('pointerdown', e => {
+  dragging = true; dragMoved = 0;
+  lastPt = { x: e.clientX, y: e.clientY };
+  try { cv.setPointerCapture(e.pointerId); } catch(_){}
+  cv.classList.add('grabbing');
+});
+
+cv.addEventListener('pointermove', e => {
+  mouse.x = e.clientX; mouse.y = e.clientY;
+  if (dragging && lastPt){
+    const dx = e.clientX - lastPt.x, dy = e.clientY - lastPt.y;
+    dragMoved += Math.abs(dx) + Math.abs(dy);
+    state.panX += dx;
+    state.panY += dy;
+    lastPt = { x: e.clientX, y: e.clientY };
+  } else {
+    updateHover();
+  }
+});
+
+cv.addEventListener('pointerup', e => {
+  cv.classList.remove('grabbing');
+  if (dragging && dragMoved < 7){
+    select(hitTest(e.clientX, e.clientY));
+  }
+  dragging = false;
+  lastPt = null;
+  updateHover();
+});
+cv.addEventListener('pointercancel', () => { dragging = false; lastPt = null; });
+cv.addEventListener('pointerleave', () => { if (!dragging) state.hover = null; });
+
+function zoomAt(mx, my, f){
+  const before = s2w(mx, my);
+  state.zoom = clamp(state.zoom * f, 0.3, 60);
+  const s = state.base * state.zoom;
+  state.panX = mx - W/2 - before.x * s;
+  state.panY = my - H/2 + before.y * s;
+}
+
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0016));
+}, { passive: false });
+
+cv.addEventListener('dblclick', e => {
+  e.preventDefault();
+  zoomAt(e.clientX, e.clientY, 1.9);
+});
+
+/* =========================================================
+   20. Zeitsteuerung
+   ========================================================= */
+const playBtn  = document.getElementById('play');
+const dirBtn   = document.getElementById('dir');
+const speedIn  = document.getElementById('speed');
+const speedLbl = document.getElementById('speedLbl');
+const dateEl   = document.getElementById('date');
+const subEl    = document.getElementById('sub');
+const dateIn   = document.getElementById('dateIn');
+const todayBtn = document.getElementById('todayBtn');
+const sizeIn   = document.getElementById('sizeMul');
+const sizeLbl  = document.getElementById('sizeLbl');
+
+function sliderToSpeed(v){ return 0.05 * Math.pow(10, (v / 100) * 4.8); }
+
+function fmtMag(d){
+  if (d < 1)  return d.toFixed(2).replace('.', ',') + ' Tage/s';
+  if (d < 60) return d.toFixed(d < 10 ? 1 : 0).replace('.', ',') + ' Tage/s';
+  const y = d / 365.25;
+  return y.toFixed(y < 10 ? 2 : 1).replace('.', ',') + ' Jahre/s';
+}
+function speedLabel(){ return (state.dir < 0 ? '◀ ' : '') + fmtMag(state.speed); }
+
+function syncDirUI(){
+  dirBtn.textContent = state.dir > 0 ? '⏩' : '⏪';
+  dirBtn.classList.toggle('rev', state.dir < 0);
+  dirBtn.title = state.dir > 0
+    ? 'Zeit läuft vorwärts – klicken für rückwärts (D)'
+    : 'Zeit läuft rückwärts – klicken für vorwärts (D)';
+  speedLbl.textContent = speedLabel();
+}
+
+state.speed = sliderToSpeed(+speedIn.value);
+syncDirUI();
+
+speedIn.addEventListener('input', () => {
+  state.speed = sliderToSpeed(+speedIn.value);
+  speedLbl.textContent = speedLabel();
+});
+
+function applySize(){
+  state.sizeMul = +sizeIn.value / 100;
+  sizeLbl.textContent = state.sizeMul.toFixed(1).replace('.', ',') + '×';
+}
+sizeIn.addEventListener('input', applySize);
+sizeIn.addEventListener('change', () => sizeIn.blur());
+applySize();
+
+playBtn.addEventListener('click', () => {
+  state.playing = !state.playing;
+  playBtn.textContent = state.playing ? '⏸' : '▶';
+});
+
+dirBtn.addEventListener('click', () => {
+  state.dir *= -1;
+  if (!state.playing){
+    state.playing = true;
+    playBtn.textContent = '⏸';
+  }
+  syncDirUI();
+});
+
+/* ---- Datum ---- */
+dateIn.value = ymdString(dateAt());
+
+dateIn.addEventListener('change', () => {
+  const v = dateIn.value;
+  if (!v){ dateIn.value = ymdString(dateAt()); return; }
+  const parts = v.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(n => !isFinite(n))) return;
+  state.t = daysFromYMD(parts[0], parts[1], parts[2]);
+  if (!isFinite(state.t)){
+    state.t = nowDays();
+    dateIn.value = ymdString(dateAt());
+  }
+  state.jump = true;
+});
+
+dateIn.addEventListener('keydown', e => {
+  if (e.key === 'Enter'){ e.preventDefault(); dateIn.blur(); }
+});
+
+function goToday(){
+  state.t = nowDays();
+  dateIn.value = ymdString(dateAt());
+  state.jump = true;
+  todayBtn.classList.add('flash');
+  setTimeout(() => todayBtn.classList.remove('flash'), 320);
+}
+todayBtn.addEventListener('click', goToday);
+
+/* ---- Zoom / Reset ---- */
+document.getElementById('zoomIn').addEventListener('click', () => zoomAt(W/2, H/2, 1.35));
+document.getElementById('zoomOut').addEventListener('click', () => zoomAt(W/2, H/2, 1/1.35));
+
+function resetView(){
+  state.zoom = 1;
+  state.panX = 0;
+  state.panY = 0;
+  state.selected = null;
+  updateChips();
+  renderInfo();
+}
+document.getElementById('reset').addEventListener('click', resetView);
+
+function refit(){
+  for (const b of BODIES) buildPath(b);
+  computeBase();
+  state.zoom = 1;
+  state.panX = 0;
+  state.panY = 0;
+}
+
+/* ---- Schalter ---- */
+document.getElementById('optOrbits').addEventListener('change', e => {
+  state.showOrbits = e.target.checked;
+});
+document.getElementById('optTrails').addEventListener('change', e => {
+  state.showTrails = e.target.checked;
+});
+document.getElementById('optLabels').addEventListener('change', e => {
+  state.showLabels = e.target.checked;
+});
+document.getElementById('optBelt').addEventListener('change', e => {
+  state.showBelt = e.target.checked;
+});
+document.getElementById('optDwarfs').addEventListener('change', e => {
+  state.showDwarfs = e.target.checked;
+  if (!state.showDwarfs && state.selected === 'pluto') select(null);
+  refit();
+});
+document.getElementById('optScale').addEventListener('change', e => {
+  state.trueScale = e.target.checked;
+  refit();
+});
+
+/* ---- Tastatur ---- */
+window.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toUpperCase();
+  const typing = tag === 'TEXTAREA' || (tag === 'INPUT' && e.target.type !== 'range');
+  if (typing){
+    if (e.key === 'Escape') e.target.blur();
+    return;
+  }
+  if (e.code === 'Space'){ e.preventDefault(); playBtn.click(); }
+  else if (e.key === 'r' || e.key === 'R'){ resetView(); }
+  else if (e.key === 't' || e.key === 'T'){ goToday(); }
+  else if (e.key === 'd' || e.key === 'D'){ dirBtn.click(); }
+  else if (e.key === '+' || e.key === '='){ zoomAt(W/2, H/2, 1.3); }
+  else if (e.key === '-' || e.key === '_'){ zoomAt(W/2, H/2, 1/1.3); }
+  else if (e.key === 'Escape'){ select(null); }
+});
+
+window.addEventListener('resize', () => {
+  const oldBase = state.base;
+  resize();
+  if (oldBase > 0){
+    const k = state.base / oldBase;
+    state.panX *= k;
+    state.panY *= k;
+  }
+});
+
+/* =========================================================
+   21. Hauptschleife
+   ========================================================= */
+const fmtDate = new Intl.DateTimeFormat('de-DE', {
+  day:'2-digit', month:'long', year:'numeric'
+});
+let last = 0, uiTimer = 0;
+
+function frame(now){
+  if (!last) last = now;
+  const dt = Math.min(0.06, (now - last) / 1000);
+  last = now;
+
+  let dTw = 0;
+  if (state.playing){
+    dTw = dt * state.speed * state.dir;
+    state.t += dTw;
+  }
+  if (state.jump){ dTw = 0; state.jump = false; }
+  state.dTw = dTw;
+
+  render(now / 1000);
+
+  uiTimer += dt;
+  if (uiTimer > 0.1){
+    uiTimer = 0;
+    const d = dateAt();
+    dateEl.textContent = fmtDate.format(d);
+    if (document.activeElement !== dateIn) dateIn.value = ymdString(d);
+    updateMoonCard();
+
+    const parts = [];
+    if (state.dir < 0) parts.push('◀ rückwärts');
+    if (state.speed > 60){
+      const secPerYear = 365.25 / state.speed;
+      parts.push('1 Jahr ≈ ' + secPerYear.toFixed(secPerYear < 10 ? 1 : 0) + ' s');
+    }
+    parts.push(state.trueScale ? 'echter Maßstab' : 'logarithmische Skala');
+    subEl.textContent = parts.join(' · ');
+  }
+
+  requestAnimationFrame(frame);
+}
+
+/* =========================================================
+   22. Start
+   ========================================================= */
+resize();
+for (const b of BODIES) buildPath(b);
+makeBelts();
+buildChips();
+computeBase();
+updateMoonLive();
+requestAnimationFrame(frame);
+
+setTimeout(() => {
+  const tip = document.getElementById('tip');
+  tip.style.opacity = '0';
+  setTimeout(() => tip.remove(), 900);
+}, 7000);
+
+})();
+</script>
+</body>
+</html>
