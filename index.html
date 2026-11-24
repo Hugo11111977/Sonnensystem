@@ -196,7 +196,7 @@
     <button class="btn" id="dir" title="Zeitrichtung umkehren (D)">⏩</button>
     <button class="btn" id="play" title="Play / Pause (Leertaste)">⏸</button>
     <div id="speedWrap">
-      <input type="range" id="speed" min="0" max="100" value="51" aria-label="Geschwindigkeit">
+      <input type="range" id="speed" min="0" max="100" value="15" aria-label="Geschwindigkeit">
       <span id="speedLbl">—</span>
     </div>
     <button class="btn" id="zoomOut" title="Herauszoomen">−</button>
@@ -434,7 +434,6 @@ const BODIES = [
   }
 ];
 
-/* ---- Monde: alle auf echten Positionen -------------------- */
 const MOONS = [
   { id:'mond', parent:'erde', name:'Mond', kind:'Trabant der Erde',
     ephem:'elp', rKm:384400, period:27.3217, rate:13.17636,
@@ -509,17 +508,12 @@ const MOONS = [
 
 /* ---- Kometen ------------------------------------------------
    Vollständige 3D-Keplerelemente (JPL SBDB, Lösung JPL#75).
-   Achtung: Halley läuft RETROGRAD, i = 162,2° – die Bahn liegt
-   also nicht in der Ekliptik. Die Draufsicht zeigt die
-   Projektion auf die Ekliptikebene; die Neigung ist damit
-   sichtbar, aber nicht die Bahn selbst.
+   Halley läuft RETROGRAD, i = 162,2° – die Bahn liegt nicht in
+   der Ekliptik. Die Draufsicht zeigt die Projektion.
 
    Tp und P sind auf die beiden belegten Periheldurchgänge
-   1986-02-08 und 2061-07-28 kalibriert. Zwischen den
-   Stützpunkten interpoliert eine reine Kepler-Ellipse; real
-   verformt die Gasausströmung (nicht-gravitative Kräfte) die
-   Bahn um einige Wochen. Kontrolle gegen JPL Horizons für den
-   24.11.2026: Abweichung 0,21 AE ≈ 0,3°.
+   1986-02-08 und 2061-07-28 kalibriert. Kontrolle gegen JPL
+   Horizons für den 24.11.2026: 0,21 AE ≈ 0,3°.
    ------------------------------------------------------------ */
 const COMETS = [
   {
@@ -569,11 +563,16 @@ const nowDays = () => (Date.now() - J2000) / 86400000;
 const LOGR = 0.35;
 const LOG_REF = Math.log(1 + 1 / LOGR);
 
+/* Startgeschwindigkeit: 0,25 Tage/s.
+   Io braucht damit 7 s pro Umlauf und ist als Punkt zu sehen,
+   die Erde 24 min pro Jahr. */
+const DEFAULT_SPEED = 0.25;
+
 const state = {
   t: nowDays(),
   playing: true,
   dir: 1,
-  speed: 15,
+  speed: DEFAULT_SPEED,
   zoom: 1,
   panX: 0, panY: 0,
   hover: null, selected: null,
@@ -621,7 +620,6 @@ function bodyLon(b, t){
   return norm360(v / DEG + b.peri);
 }
 
-/* wahre Position in AE (für Abstandsrechnungen) */
 function bodyAU(b, t){
   const M = (b.L - b.peri) * DEG + TAU * (t / b.period);
   const E = solveKepler(M, b.e);
@@ -665,9 +663,6 @@ function cometPos(c, t){
   return p;
 }
 
-/* Projektion in die Draufsicht: der scheinbare Abstand von der
-   Sonne ist rho (die Ekliptik-Komponente), also wird rho durch
-   die Abstandsskala geschickt – die Richtung bleibt erhalten. */
 function cometWorld(c, t){
   const p = cometPos(c, t);
   const sc = p.rho > 1e-6 ? project(p.rho) / p.rho : 0;
@@ -952,7 +947,6 @@ function drawOrbits(){
     ctx.stroke();
   }
 
-  /* Kometenbahn: gepunktet, um sie von den Planetenbahnen zu trennen */
   if (state.showComet){
     for (const c of COMETS){
       const p = c.path;
@@ -1253,12 +1247,6 @@ function drawMoons(parent, px, py, pr){
 
 /* =========================================================
    15. Komet
-   ---------------------------------------------------------
-   Koma + zwei Schweife, die sonnenabgewandt zeigen:
-   ein breiter, leicht gekrümmter Staubschweif und ein
-   schmaler, gerader Ionenschweif. Beide wachsen mit 1/r²,
-   also nur in Sonnennähe sichtbar – im Aphel ist Halley
-   ein inaktiver, punktförmiger Kern.
    ========================================================= */
 function drawComet(c, time){
   const cw = cometWorld(c, state.t);
@@ -1269,7 +1257,6 @@ function drawComet(c, time){
                      c.size * 1.7 * vscale * state.sizeMul * Math.pow(state.zoom, 0.28));
   positions[c.id] = { sx: s.x, sy: s.y, r: Math.max(r + 3, 10) };
 
-  /* Bewegungsrichtung für den Kometenschweif der letzten Frames */
   if (state.showTrails && state.dTw){
     const N = 12;
     const span = state.dTw * 26;
@@ -1289,7 +1276,6 @@ function drawComet(c, time){
     }
   }
 
-  /* Schweife – nur in Sonnennähe */
   const tailBase = 95 / (cw.r * cw.r);
   const tailLen = clamp(tailBase, 0, 150) * Math.pow(state.zoom, 0.25);
 
@@ -1299,7 +1285,6 @@ function drawComet(c, time){
     const ux = dxs / dl, uy = dys / dl;
     const nx = -uy, ny = ux;
 
-    /* Staubschweif: breit, leicht gekrümmt, gelblich-weiß */
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(s.x + nx * r * 0.7, s.y + ny * r * 0.7);
@@ -1324,7 +1309,6 @@ function drawComet(c, time){
     ctx.fill();
     ctx.restore();
 
-    /* Ionenschweif: schmal, gerade, bläulich */
     ctx.beginPath();
     ctx.moveTo(s.x + nx * r * 0.35, s.y + ny * r * 0.35);
     ctx.lineTo(s.x + ux * tailLen * 1.25 + nx * r * 0.9,
@@ -1342,7 +1326,6 @@ function drawComet(c, time){
     ctx.fill();
   }
 
-  /* Koma */
   const coma = r * (2.4 + clamp(tailBase * 0.02, 0, 2.4));
   const gc = ctx.createRadialGradient(s.x, s.y, r * 0.4, s.x, s.y, coma);
   gc.addColorStop(0, 'rgba(220,255,246,0.55)');
@@ -1353,7 +1336,6 @@ function drawComet(c, time){
   ctx.arc(s.x, s.y, coma, 0, TAU);
   ctx.fill();
 
-  /* Kern */
   const gn = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, r);
   gn.addColorStop(0, '#ffffff');
   gn.addColorStop(0.55, c.light);
@@ -1635,8 +1617,7 @@ function renderInfo(){
       '</div>';
     note = '<p class="note">Bahn aus den JPL-Elementen (Lösung JPL#75). ' +
       'Halley läuft retrograd und ist 162° gegen die Ekliptik geneigt – dargestellt ' +
-      'ist die Projektion von oben, nicht die räumliche Bahn. Abweichung gegen ' +
-      'JPL Horizons aktuell unter 0,3°.</p>';
+      'ist die Projektion von oben, nicht die räumliche Bahn.</p>';
   }
 
   infoEl.style.setProperty('--c', b.light);
@@ -1800,6 +1781,10 @@ cv.addEventListener('dblclick', e => {
 
 /* =========================================================
    20. Zeitsteuerung
+   ---------------------------------------------------------
+   Die Reglerskala ist so verankert, dass Position 15 exakt
+   0,25 Tage/s entspricht. Die Schritte bleiben ganzzahlig,
+   die Tastatursteuerung funktioniert also normal.
    ========================================================= */
 const playBtn  = document.getElementById('play');
 const dirBtn   = document.getElementById('dir');
@@ -1812,7 +1797,16 @@ const todayBtn = document.getElementById('todayBtn');
 const sizeIn   = document.getElementById('sizeMul');
 const sizeLbl  = document.getElementById('sizeLbl');
 
-function sliderToSpeed(v){ return 0.05 * Math.pow(10, (v / 100) * 4.8); }
+const SPEED_ANCHOR = 15;            /* Reglerposition für DEFAULT_SPEED */
+const SPEED_MIN = 0.05;             /* Tage/s bei Reglerposition 0 */
+
+function sliderToSpeed(v){
+  return SPEED_MIN * Math.pow(10, (v - SPEED_ANCHOR) / 100 * 4.8)
+         * (DEFAULT_SPEED / SPEED_MIN);
+}
+function speedToSlider(d){
+  return clamp(SPEED_ANCHOR + 100 * Math.log10(d / DEFAULT_SPEED) / 4.8, 0, 100);
+}
 
 function fmtMag(d){
   if (d < 1)  return d.toFixed(2).replace('.', ',') + ' Tage/s';
@@ -1831,6 +1825,8 @@ function syncDirUI(){
   speedLbl.textContent = speedLabel();
 }
 
+/* Startzustand: Regler auf die Position, die 0,25 Tage/s ergibt */
+speedIn.value = String(SPEED_ANCHOR);
 state.speed = sliderToSpeed(+speedIn.value);
 syncDirUI();
 
